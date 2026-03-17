@@ -1,0 +1,14 @@
+| Component / Usage       | Color Name     | Hex Code | Notes / Purpose                         |
+| ----------------------- | -------------- | -------- | --------------------------------------- |
+| Navbar Background       | Deep Navy      | #161E54  | Main navbar, headers                    |
+| Navbar Text / Links     | Light Blue     | #BBE0EF  | Contrasts with navbar background        |
+| Primary Buttons         | Deep Navy      | #161E54  | Main CTA buttons                        |
+| Secondary Buttons       | Soft Orange    | #FF986A  | Secondary actions                       |
+| Accent / Highlights     | Vibrant Orange | #F16D34  | Important notifications, alerts, badges |
+| Page Background         | Light Blue     | #BBE0EF  | General background for pages            |
+| Card / Panel Background | White          | #FFFFFF  | Cards, tables, panels                   |
+| Text Primary            | Deep Navy      | #161E54  | Main readable text                      |
+| Text Secondary          | Dark Gray      | #6C757D  | Subtext, meta info                      |
+| Status – Success        | Green          | #2ECC71  | Completed tasks                         |
+| Status – Warning        | Vibrant Orange | #F16D34  | Pending tasks                           |
+| Status – Error          | Red            | #E76F51  | Failed tasks or errors                  |

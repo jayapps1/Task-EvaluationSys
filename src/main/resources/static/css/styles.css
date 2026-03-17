@@ -1,0 +1,59 @@
+/* START NAVBAR CSS */
+
+.navbar-custom {
+    background-color: #161E54; /* Deep Navy */
+}
+
+/* Brand */
+.navbar-custom .navbar-brand {
+    color: #BBE0EF; /* Light Blue */
+    text-decoration: none; /* Remove default underline */
+}
+
+/* Nav links */
+.navbar-custom .nav-link {
+    color: #BBE0EF; /* Light Blue text */
+    text-decoration: none; /* Remove default underline */
+    position: relative; /* Needed for underline effect */
+    transition: color 0.3s, border-bottom 0.3s;
+}
+
+/* Active link */
+.navbar-custom .nav-link.active {
+    color: #F16D34 !important; /* Vibrant Orange */
+    border-bottom: 2px solid #F16D34; /* Underline for active */
+}
+
+/* Hover / focus effect with underline */
+.navbar-custom .nav-link:hover,
+.navbar-custom .nav-link:focus {
+    color: #F16D34; /* Vibrant Orange */
+    border-bottom: 2px solid #F16D34; /* Underline on hover */
+}
+
+/* Buttons */
+.navbar-custom .btn-outline-success {
+    border-color: #2ECC71; /* Status Success Green */
+    color: #2ECC71;
+}
+
+.navbar-custom .btn-outline-success:hover {
+    background-color: #2ECC71;
+    color: #FFFFFF;
+}
+
+/* Dropdown menu */
+.navbar-custom .dropdown-menu {
+    background-color: #161E54;
+}
+
+.navbar-custom .dropdown-item {
+    color: #BBE0EF;
+}
+
+.navbar-custom .dropdown-item:hover {
+    color: #FFFFFF;
+    background-color: #F16D34; /* Vibrant Orange highlight */
+}
+
+/* END NAVBAR CSS */
