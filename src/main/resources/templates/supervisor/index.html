@@ -1,0 +1,394 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Supervisor Dashboard - Task Evaluation System</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link rel="stylesheet" th:href="@{/css/styles.css}">
+    <link rel="stylesheet" th:href="@{/css/quries.css}">
+
+    <style>
+        :root {
+            --deep-navy: #161E54;
+            --light-blue: #BBE0EF;
+            --soft-orange: #FF986A;
+            --vibrant-orange: #F16D34;
+            --white: #FFFFFF;
+            --dark-gray: #6C757D;
+            --success-green: #2ECC71;
+            --error-red: #E76F51;
+            --warning-yellow: #F1C40F;
+        }
+
+        body {
+            background-color: var(--light-blue);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+        }
+
+        .dashboard-container {
+            padding: 20px;
+            margin-top: 70px;
+        }
+
+        .stats-card {
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+            cursor: pointer;
+            border: none;
+            margin-bottom: 20px;
+        }
+
+        .stats-card:hover { transform: translateY(-5px); }
+
+        .stats-card.total { background: linear-gradient(135deg, var(--deep-navy), #2a3f8a); color: white; }
+        .stats-card.progress { background: linear-gradient(135deg, var(--soft-orange), #ffb347); color: white; }
+        .stats-card.pending { background: linear-gradient(135deg, var(--vibrant-orange), #ff8c42); color: white; }
+        .stats-card.approved { background: linear-gradient(135deg, var(--success-green), #3ae374); color: white; }
+
+        .task-card {
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+            margin-bottom: 20px;
+            border: none;
+            background: var(--white);
+        }
+
+        .task-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 15px rgba(0,0,0,0.2);
+        }
+
+        .status-badge {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .status-IN_PROGRESS { background-color: var(--soft-orange); color: white; }
+        .status-PENDING_REVIEW { background-color: var(--warning-yellow); color: #333; }
+        .status-APPROVED { background-color: var(--success-green); color: white; }
+
+        .btn-approve {
+            background-color: var(--success-green);
+            border: none;
+            color: white;
+            border-radius: 20px;
+            padding: 5px 15px;
+        }
+        .btn-approve:hover { background-color: #27ae60; }
+
+        .btn-reject {
+            background-color: var(--error-red);
+            border: none;
+            color: white;
+            border-radius: 20px;
+            padding: 5px 15px;
+        }
+        .btn-reject:hover { background-color: #c0392b; }
+
+        .btn-view {
+            background-color: var(--deep-navy);
+            border: none;
+            color: white;
+            border-radius: 20px;
+            padding: 5px 15px;
+        }
+        .btn-view:hover { background-color: #0f1442; }
+
+        .header-supervisor {
+            background: var(--white);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .filter-btn {
+            border-radius: 20px;
+            padding: 8px 20px;
+            margin: 0 5px;
+            cursor: pointer;
+            background-color: var(--white);
+            color: var(--deep-navy);
+            border: 1px solid var(--deep-navy);
+        }
+        .filter-btn:hover, .filter-btn.active {
+            background-color: var(--deep-navy);
+            color: white;
+        }
+
+        .section-title {
+            color: var(--deep-navy);
+            border-left: 4px solid var(--vibrant-orange);
+            padding-left: 15px;
+            margin-bottom: 20px;
+            margin-top: 30px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            background: var(--white);
+            border-radius: 15px;
+        }
+        .empty-state i { font-size: 48px; color: var(--dark-gray); margin-bottom: 15px; }
+
+        .task-code { font-family: monospace; font-size: 14px; font-weight: bold; color: var(--deep-navy); }
+        .deadline-warning { color: var(--error-red); font-weight: bold; }
+        .reject-modal-header { background-color: var(--error-red); color: white; }
+    </style>
+</head>
+
+<body>
+<div th:replace="~{layout/supervisor/navbar :: navbar}"></div>
+
+<div class="dashboard-container">
+    <div class="container-fluid">
+        <!-- Header -->
+        <div class="header-supervisor">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h2><i class="fas fa-chalkboard-user"></i> Supervisor Dashboard</h2>
+                    <p class="text-muted mb-0">Welcome back, <strong th:text="${supervisorName}"></strong></p>
+                    <small class="text-muted">Staff Code: <strong th:text="${staffCode}"></strong></small>
+                </div>
+                <div class="col-md-4 text-end">
+                    <i class="fas fa-tasks fa-3x" style="color: var(--deep-navy);"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card stats-card total">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="fas fa-chart-line"></i> Total Tasks</h5>
+                        <h2 th:text="${statistics.totalTasks}">0</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stats-card progress">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="fas fa-spinner"></i> In Progress</h5>
+                        <h2 th:text="${statistics.inProgressTasks}">0</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stats-card pending">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="fas fa-clock"></i> Pending Review</h5>
+                        <h2 th:text="${statistics.pendingReviewTasks}">0</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stats-card approved">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="fas fa-check-circle"></i> Approved</h5>
+                        <h2 th:text="${statistics.approvedTasks}">0</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter Section -->
+        <div class="mb-4">
+            <div class="btn-group flex-wrap">
+                <button class="btn filter-btn active" data-filter="ALL">All Tasks</button>
+                <button class="btn filter-btn" data-filter="IN_PROGRESS">In Progress</button>
+                <button class="btn filter-btn" data-filter="PENDING_REVIEW">Pending Review</button>
+                <button class="btn filter-btn" data-filter="APPROVED">Approved</button>
+            </div>
+        </div>
+
+        <!-- Pending Review Section -->
+        <div class="section-title">
+            <h4><i class="fas fa-clock text-warning"></i> Tasks Pending Your Review</h4>
+        </div>
+        <div class="row" id="pendingReviewContainer">
+            <div th:each="task : ${pendingReviews}" class="col-md-6 col-lg-4 task-item mb-3"
+                 th:data-status="${task.taskStatus}">
+                <div class="card task-card h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <div>
+                                <h6 class="task-code" th:text="${task.taskCode}">TSK/24/001</h6>
+                                <small class="text-muted" th:text="${task.description}">Task Description</small>
+                            </div>
+                            <span class="status-badge" th:classappend="'status-' + ${task.taskStatus}"
+                                  th:text="${task.taskStatus}">PENDING_REVIEW</span>
+                        </div>
+                        <div class="mb-2">
+                            <small class="text-muted"><i class="fas fa-user"></i> Staff: <strong th:text="${task.createdByName}">Staff Name</strong></small>
+                        </div>
+                        <div class="mb-2">
+                            <small class="text-muted"><i class="fas fa-calendar-alt"></i> Created: <span th:text="${#temporals.format(task.createdAt, 'yyyy-MM-dd')}"></span></small>
+                        </div>
+                        <div th:if="${task.deadline}" class="mb-2">
+                            <small th:classappend="${task.deadline != null && #temporals.createNow().isAfter(task.deadline)} ? 'deadline-warning' : ''">
+                                <i class="fas fa-hourglass-end"></i> Deadline: <span th:text="${#temporals.format(task.deadline, 'yyyy-MM-dd HH:mm')}"></span>
+                            </small>
+                        </div>
+                        <div class="mt-3">
+                            <button class="btn btn-approve btn-sm approve-task" th:data-task-id="${task.taskId}" th:data-task-code="${task.taskCode}"><i class="fas fa-check-circle"></i> Approve</button>
+                            <button class="btn btn-reject btn-sm reject-task" th:data-task-id="${task.taskId}" th:data-task-code="${task.taskCode}"><i class="fas fa-times-circle"></i> Reject</button>
+                            <button class="btn btn-view btn-sm view-details" th:data-task-id="${task.taskId}"><i class="fas fa-info-circle"></i> View</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div th:if="${pendingReviews.isEmpty()}" class="col-12">
+                <div class="empty-state"><i class="fas fa-check-circle"></i><h5>No Pending Reviews</h5><p>All tasks have been reviewed. Great job!</p></div>
+            </div>
+        </div>
+
+        <!-- In Progress Section -->
+        <div class="section-title mt-4">
+            <h4><i class="fas fa-play-circle text-info"></i> Tasks In Progress</h4>
+        </div>
+        <div class="row" id="inProgressContainer">
+            <div th:each="task : ${inProgressTasks}" class="col-md-6 col-lg-4 task-item mb-3"
+                 th:data-status="${task.taskStatus}">
+                <div class="card task-card h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <div>
+                                <h6 class="task-code" th:text="${task.taskCode}">TSK/24/001</h6>
+                                <small class="text-muted" th:text="${task.description}">Task Description</small>
+                            </div>
+                            <span class="status-badge" th:classappend="'status-' + ${task.taskStatus}"
+                                  th:text="${task.taskStatus}">IN_PROGRESS</span>
+                        </div>
+                        <div class="mb-2">
+                            <small class="text-muted"><i class="fas fa-user"></i> Staff: <strong th:text="${task.createdByName}">Staff Name</strong></small>
+                        </div>
+                        <div class="mb-2">
+                            <small class="text-muted"><i class="fas fa-calendar-alt"></i> Created: <span th:text="${#temporals.format(task.createdAt, 'yyyy-MM-dd')}"></span></small>
+                        </div>
+                        <div th:if="${task.deadline}" class="mb-2">
+                            <small th:classappend="${task.deadline != null && #temporals.createNow().isAfter(task.deadline)} ? 'deadline-warning' : ''">
+                                <i class="fas fa-hourglass-end"></i> Deadline: <span th:text="${#temporals.format(task.deadline, 'yyyy-MM-dd HH:mm')}"></span>
+                            </small>
+                        </div>
+                        <div class="mt-3">
+                            <button class="btn btn-view btn-sm view-details" th:data-task-id="${task.taskId}"><i class="fas fa-info-circle"></i> View Details</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div th:if="${inProgressTasks.isEmpty()}" class="col-12">
+                <div class="empty-state"><i class="fas fa-play-circle"></i><h5>No Tasks In Progress</h5><p>Staff members haven't started any tasks yet.</p></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Task Detail Modal -->
+<div class="modal fade" id="taskDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header" style="background-color: var(--deep-navy); color: white;">
+                <h5 class="modal-title"><i class="fas fa-tasks"></i> Task Details</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="modalTaskContent"><div class="text-center"><div class="spinner-border text-primary" role="status"></div></div></div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div>
+        </div>
+    </div>
+</div>
+
+<!-- Rejection Modal -->
+<div class="modal fade" id="rejectModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header reject-modal-header">
+                <h5 class="modal-title"><i class="fas fa-times-circle"></i> Reject Task</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Please provide a reason for rejecting this task:</p>
+                <textarea id="rejectionReason" class="form-control" rows="4" placeholder="Explain why the task needs to be redone..."></textarea>
+                <input type="hidden" id="rejectTaskId"><input type="hidden" id="rejectTaskCode">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmRejectBtn"><i class="fas fa-times-circle"></i> Confirm Reject</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+    $(document).ready(function() {
+        let rejectModal = new bootstrap.Modal(document.getElementById('rejectModal'));
+
+        $('.filter-btn').click(function() {
+            $('.filter-btn').removeClass('active');
+            $(this).addClass('active');
+            let filter = $(this).data('filter');
+            if (filter === 'ALL') $('.task-item').show();
+            else { $('.task-item').hide(); $(`.task-item[data-status="${filter}"]`).show(); }
+        });
+
+        $('.approve-task').click(function() {
+            let taskId = $(this).data('task-id'), taskCode = $(this).data('task-code');
+            Swal.fire({ title: 'Approve Task?', html: `Approve task <strong>${taskCode}</strong>?`, icon: 'question', showCancelButton: true, confirmButtonColor: '#2ECC71', confirmButtonText: 'Yes, approve!' })
+            .then((result) => { if (result.isConfirmed) {
+                $.post(`/supervisor/task/${taskId}/approve`, function(response) {
+                    if (response.status === 'success') { Swal.fire('Approved!', response.message, 'success'); setTimeout(() => location.reload(), 1500); }
+                    else { Swal.fire('Error!', response.message, 'error'); }
+                }).fail(() => Swal.fire('Error!', 'Failed to approve task', 'error'));
+            }});
+        });
+
+        $('.reject-task').click(function() {
+            $('#rejectTaskId').val($(this).data('task-id'));
+            $('#rejectTaskCode').val($(this).data('task-code'));
+            $('#rejectionReason').val('');
+            rejectModal.show();
+        });
+
+        $('#confirmRejectBtn').click(function() {
+            let taskId = $('#rejectTaskId').val(), taskCode = $('#rejectTaskCode').val(), reason = $('#rejectionReason').val().trim();
+            if (!reason) { Swal.fire('Error!', 'Please provide a reason', 'error'); return; }
+            Swal.fire({ title: 'Reject Task?', html: `Reject task <strong>${taskCode}</strong>?<br>Reason: ${reason}`, icon: 'warning', showCancelButton: true, confirmButtonColor: '#E76F51', confirmButtonText: 'Yes, reject!' })
+            .then((result) => { if (result.isConfirmed) {
+                $.post(`/supervisor/task/${taskId}/reject`, { reason: reason }, function(response) {
+                    if (response.status === 'success') { Swal.fire('Rejected!', response.message, 'success'); rejectModal.hide(); setTimeout(() => location.reload(), 1500); }
+                    else { Swal.fire('Error!', response.message, 'error'); }
+                }).fail(() => Swal.fire('Error!', 'Failed to reject task', 'error'));
+            }});
+        });
+
+        $('.view-details').click(function() {
+            let taskCard = $(this).closest('.task-card');
+            $('#modalTaskContent').html(`<table class="table table-bordered">
+                <tr><th>Task Code:</th><td>${taskCard.find('.task-code').text()}</td></tr>
+                <tr><th>Description:</th><td>${taskCard.find('.text-muted').first().text()}</td></tr>
+                <tr><th>Status:</th><td>${taskCard.find('.status-badge').text()}</td></tr>
+                <tr><th>Staff:</th><td>${taskCard.find('small:contains("Staff")').text().replace('Staff:', '').trim()}</td></tr>
+                <tr><th>Created:</th><td>${taskCard.find('small:contains("Created")').text().replace('Created:', '')}</td></tr>
+                <tr><th>Deadline:</th><td>${taskCard.find('small:contains("Deadline")').text().replace('Deadline:', '') || 'N/A'}</td></tr>
+            </table>`);
+            new bootstrap.Modal(document.getElementById('taskDetailModal')).show();
+        });
+    });
+</script>
+</body>
+</html>

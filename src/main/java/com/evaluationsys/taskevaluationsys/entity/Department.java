@@ -36,6 +36,9 @@ public class Department {
     )
     private Branch branch;
 
+
+
+
     // =========================
     // TIMESTAMPS
     // =========================

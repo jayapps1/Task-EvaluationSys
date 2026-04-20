@@ -1,11 +1,14 @@
 package com.evaluationsys.taskevaluationsys.entity;
 
+import com.evaluationsys.taskevaluationsys.entity.enums.Quarter;
+import com.evaluationsys.taskevaluationsys.entity.enums.TaskStatus;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 import static jakarta.persistence.GenerationType.SEQUENCE;
 
 @Entity
+@Table(name = "task")
 public class Task {
 
     @Id
@@ -15,37 +18,54 @@ public class Task {
             allocationSize = 1
     )
     @GeneratedValue(strategy = SEQUENCE, generator = "task_sequence")
-    private Long task_id;
+    @Column(name = "task_id")
+    private Long taskId;
 
-    @Column(unique = true)
+    @Column(name = "task_code", unique = true, nullable = false)
     private String taskCode;
 
+    @Column(name = "description")
     private String description;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "supervisor_id", foreignKey = @ForeignKey(name = "fk_task_supervisor"))
     private Supervisor supervisor;
 
-    @ManyToOne
-    @JoinColumn(name = "created_by", foreignKey = @ForeignKey(name = "fk_task_created_supervisor"))
-    private Supervisor createdSupervisor;
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "created_by", foreignKey = @ForeignKey(name = "fk_task_created_user"))
+    private User createdBy;
 
-    @ManyToOne
-    @JoinColumn(name = "department_id", foreignKey = @ForeignKey(name = "fk_task_department"))
-    private Department department;
-
+    @Column(name = "deadline")
     private LocalDateTime deadline;
-    private String taskStatus;
-    private Integer quarter;
+
+    // ============================
+    // Use enums instead of String/Integer
+    // ============================
+    @Enumerated(EnumType.STRING)
+    @Column(name = "task_status")
+    private TaskStatus taskStatus;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "quarter")
+    private Quarter quarter;
+
+    @Column(name = "year")
     private Integer year;
-    private LocalDateTime created_at;
-    private LocalDateTime updated_at;
+
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 
     public Task() {}
 
-    // Getters and setters
-    public Long getTask_id() { return task_id; }
-    public void setTask_id(Long task_id) { this.task_id = task_id; }
+    // ===============================
+    // GETTERS & SETTERS
+    // ===============================
+
+    public Long getTaskId() { return taskId; }
+    public void setTaskId(Long taskId) { this.taskId = taskId; }
 
     public String getTaskCode() { return taskCode; }
     public void setTaskCode(String taskCode) { this.taskCode = taskCode; }
@@ -56,38 +76,36 @@ public class Task {
     public Supervisor getSupervisor() { return supervisor; }
     public void setSupervisor(Supervisor supervisor) { this.supervisor = supervisor; }
 
-    public Supervisor getCreatedSupervisor() { return createdSupervisor; }
-    public void setCreatedSupervisor(Supervisor createdSupervisor) { this.createdSupervisor = createdSupervisor; }
-
-    public Department getDepartment() { return department; }
-    public void setDepartment(Department department) { this.department = department; }
+    public User getCreatedBy() { return createdBy; }
+    public void setCreatedBy(User createdBy) { this.createdBy = createdBy; }
 
     public LocalDateTime getDeadline() { return deadline; }
     public void setDeadline(LocalDateTime deadline) { this.deadline = deadline; }
 
-    public String getTaskStatus() { return taskStatus; }
-    public void setTaskStatus(String taskStatus) { this.taskStatus = taskStatus; }
+    public TaskStatus getTaskStatus() { return taskStatus; }
+    public void setTaskStatus(TaskStatus taskStatus) { this.taskStatus = taskStatus; }
 
-    public Integer getQuarter() { return quarter; }
-    public void setQuarter(Integer quarter) { this.quarter = quarter; }
+    public Quarter getQuarter() { return quarter; }
+    public void setQuarter(Quarter quarter) { this.quarter = quarter; }
 
     public Integer getYear() { return year; }
     public void setYear(Integer year) { this.year = year; }
 
-    public LocalDateTime getCreated_at() { return created_at; }
-    public void setCreated_at(LocalDateTime created_at) { this.created_at = created_at; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
 
-    public LocalDateTime getUpdated_at() { return updated_at; }
-    public void setUpdated_at(LocalDateTime updated_at) { this.updated_at = updated_at; }
+    // ===============================
+    // AUTO TIMESTAMPS
+    // ===============================
 
     @PrePersist
     public void prePersist() {
-        this.created_at = LocalDateTime.now();
-        this.updated_at = LocalDateTime.now();
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
     }
 
     @PreUpdate
     public void preUpdate() {
-        this.updated_at = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
     }
 }

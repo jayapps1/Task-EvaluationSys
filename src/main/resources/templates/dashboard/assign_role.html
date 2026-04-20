@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Role Management</title>
+
+    <!-- Bootstrap -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+
+    <!-- Select2 -->
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <link rel="stylesheet" th:href="@{/css/styles.css}">
+    <link rel="stylesheet" th:href="@{/css/quries.css}">
+
+    <style>
+        /* General page background */
+        body { background-color: #BBE0EF; color: #161E54; } /* Page Background + Text Primary */
+
+        .select2-container { width: 100% !important; }
+        .roleBadge { min-width: 80px; display: inline-block; text-align: center; font-weight: 500; }
+
+        /* Table colors */
+        table.table thead { background-color: #161E54; color: #BBE0EF; }
+        table.table tbody tr:nth-child(even) { background-color: #FFFFFF; }
+        table.table tbody tr:nth-child(odd) { background-color: #BBE0EF; }
+        table.table tbody td { color: #161E54; }
+
+        /* Badges based on role/status */
+        .roleBadge.bg-success { background-color: #2ECC71 !important; color: #FFFFFF; } /* Success */
+        .roleBadge.bg-warning { background-color: #F16D34 !important; color: #161E54; } /* Supervisor / Warning */
+        .roleBadge.bg-danger  { background-color: #E76F51 !important; color: #FFFFFF; } /* Admin / Error */
+
+        /* Buttons */
+        .btn-primary { background-color: #161E54; border-color: #161E54; }
+        .btn-secondary { background-color: #FF986A; border-color: #FF986A; }
+
+        /* Pagination colors */
+        .pagination .page-item.active .page-link { background-color: #F16D34; border-color: #F16D34; color: #FFFFFF; }
+        .pagination .page-link { color: #161E54; }
+        .pagination .page-item.disabled .page-link { color: #6C757D; }
+    </style>
+</head>
+<body class="p-4">
+
+<div class="container">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="fw-bold">Role Assignment</h2>
+        <a href="/admin/dashboard" class="btn btn-secondary">⬅ Back Home</a>
+    </div>
+
+    <!-- Search Field -->
+    <div class="mb-3">
+        <input type="text" id="searchInput" class="form-control" placeholder="Search by name or staff code...">
+    </div>
+
+    <div id="successMsg" class="alert alert-success d-none"></div>
+
+    <table class="table table-bordered table-striped">
+        <thead>
+        <tr>
+            <th>#</th>
+            <th>Staff Code</th>
+            <th>Full Name</th>
+            <th>Current Role</th>
+            <th>Change Role</th>
+        </tr>
+        </thead>
+        <tbody id="userTableBody"></tbody>
+    </table>
+
+    <!-- Pagination -->
+    <nav aria-label="User table pagination">
+        <ul class="pagination justify-content-center" id="paginationControls"></ul>
+    </nav>
+
+</div>
+
+<script>
+    const USER_API = "/users/fetchAllUsers";
+    const UPDATE_ROLE_API = "/users/updateRoleOnly";
+    const USERS_PER_PAGE = 50;
+    let currentPage = 1;
+    let paginatedUsers = [];
+    let usersMap = {};
+    let loggedInAdminStaffCode = '[[${loggedInAdminStaffCode}]]';
+
+    $(document).ready(function () {
+        loadUsers();
+
+        // Filter users as you type
+        $("#searchInput").on("input", function() {
+            const query = $(this).val().toLowerCase();
+            paginatedUsers = Object.values(usersMap).filter(u =>
+                (u.staffCode ?? "").toLowerCase().includes(query) ||
+                ((u.firstName ?? "") + " " + (u.otherName ?? "")).toLowerCase().includes(query)
+            );
+            currentPage = 1;
+            renderTable();
+            renderPagination();
+        });
+    });
+
+    function loadUsers() {
+        $("#userTableBody").html(`<tr><td colspan="5" class="text-center text-muted">Loading users...</td></tr>`);
+
+        $.get(USER_API)
+            .done(function(data){
+                usersMap = {};
+                paginatedUsers = data;
+                data.forEach(u => usersMap[u.staffCode] = u);
+                currentPage = 1;
+                renderTable();
+                renderPagination();
+            })
+            .fail(function(){
+                $("#userTableBody").html(`<tr><td colspan="5" class="text-danger text-center">Failed to load users</td></tr>`);
+            });
+    }
+
+    function renderTable() {
+        let rows = "";
+        const start = (currentPage - 1) * USERS_PER_PAGE;
+        const end = start + USERS_PER_PAGE;
+        const pageUsers = paginatedUsers.slice(start, end);
+
+        if (pageUsers.length === 0) {
+            rows = `<tr><td colspan="5" class="text-center text-muted">No users found</td></tr>`;
+        } else {
+            let count = start;
+            pageUsers.forEach(function(u){
+                const staffCode = u.staffCode ?? "";
+                const firstName = u.firstName ?? "";
+                const otherName = u.otherName ?? "";
+                const role = u.role ?? "STAFF";
+
+                count++;
+                let badgeClass = "bg-success";
+                if (role === "ADMIN") badgeClass = "bg-danger";
+                else if (role === "SUPERVISOR") badgeClass = "bg-warning text-dark";
+
+                const disabled = (staffCode == loggedInAdminStaffCode) ? "disabled" : "";
+
+                rows += `
+                <tr>
+                    <td>${count}</td>
+                    <td>${staffCode}</td>
+                    <td>${firstName} ${otherName}</td>
+                    <td><span class="badge roleBadge ${badgeClass}">${role}</span></td>
+                    <td>
+                        <select class="form-control roleSelect" id="role_${staffCode}" ${disabled}>
+                            <option value="ADMIN" ${role === 'ADMIN' ? 'selected' : ''}>ADMIN</option>
+                            <option value="SUPERVISOR" ${role === 'SUPERVISOR' ? 'selected' : ''}>SUPERVISOR</option>
+                            <option value="STAFF" ${role === 'STAFF' ? 'selected' : ''}>STAFF</option>
+                        </select>
+                    </td>
+                </tr>`;
+            });
+        }
+
+        $("#userTableBody").html(rows);
+        $('.roleSelect').select2({ width: '100%', minimumResultsForSearch: Infinity });
+    }
+
+    function renderPagination() {
+        const totalPages = Math.ceil(paginatedUsers.length / USERS_PER_PAGE);
+        const pagination = $("#paginationControls");
+        pagination.empty();
+
+        if (totalPages <= 1) return;
+
+        pagination.append(`<li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+        <a class="page-link" href="#" data-page="${currentPage - 1}">Previous</a></li>`);
+
+        for (let i = 1; i <= totalPages; i++) {
+            pagination.append(`<li class="page-item ${i === currentPage ? 'active' : ''}">
+            <a class="page-link" href="#" data-page="${i}">${i}</a></li>`);
+        }
+
+        pagination.append(`<li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+        <a class="page-link" href="#" data-page="${currentPage + 1}">Next</a></li>`);
+    }
+
+    $(document).on("click", "#paginationControls .page-link", function(e){
+        e.preventDefault();
+        const page = parseInt($(this).data("page"));
+        const totalPages = Math.ceil(paginatedUsers.length / USERS_PER_PAGE);
+        if(page >= 1 && page <= totalPages) {
+            currentPage = page;
+            renderTable();
+            renderPagination();
+        }
+    });
+
+    // Keep your existing role change logic
+    $(document).on('change', '.roleSelect', function(){
+        const staffCode = $(this).attr('id').split('_')[1];
+        const selectedRole = $(this).val();
+        const previousRole = usersMap[staffCode].role ?? "STAFF";
+
+        if (selectedRole === previousRole) return;
+
+        if (staffCode == loggedInAdminStaffCode && selectedRole !== "ADMIN") {
+            showError("You cannot demote yourself!");
+            $(this).val(previousRole).trigger('change.select2');
+            return;
+        }
+
+        $.ajax({
+            url: `${UPDATE_ROLE_API}/${staffCode}?role=${selectedRole}`,
+            type: "PUT",
+            success: function () {
+                const row = $(`#role_${staffCode}`).closest("tr");
+                const badge = row.find("td:nth-child(4) span");
+
+                badge.text(selectedRole);
+                badge.removeClass().addClass("badge roleBadge");
+                if (selectedRole === "ADMIN") badge.addClass("bg-danger");
+                else if (selectedRole === "SUPERVISOR") badge.addClass("bg-warning text-dark");
+                else badge.addClass("bg-success");
+
+                usersMap[staffCode].role = selectedRole;
+                showSuccess("Role updated successfully");
+            },
+            error: function () {
+                $(`#role_${staffCode}`).val(previousRole).trigger('change.select2');
+                showError("Failed to update role");
+            }
+        });
+    });
+
+    function showSuccess(message) {
+        const msg = $("#successMsg");
+        msg.removeClass("d-none alert-danger").addClass("alert-success").text(message);
+        setTimeout(() => { msg.addClass("d-none"); }, 2000);
+    }
+
+    function showError(message) {
+        const msg = $("#successMsg");
+        msg.removeClass("d-none alert-success").addClass("alert-danger").text(message);
+        setTimeout(() => { msg.addClass("d-none"); }, 3000);
+    }
+</script>
+</body>
+</html>

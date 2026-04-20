@@ -30,26 +30,39 @@ public class Supervisor {
     )
     private Department department;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(
             name = "staff_id",
             foreignKey = @ForeignKey(name = "fk_supervisor_user")
     )
     private User user;
 
+
+    @ManyToOne
+    @JoinColumn(
+            name = "branch_id",
+            foreignKey = @ForeignKey(name = "fk_supervisor_branch")
+    )
+    private Branch branch;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
     public Supervisor() {}
 
-    public Supervisor(String supervisorCode, Department department, User user) {
+    public Supervisor(String supervisorCode, Department department, User user, Branch branch) {
         this.supervisorCode = supervisorCode;
         this.department = department;
         this.user = user;
+        this.branch = branch;
     }
 
     public Long getSupervisorId() {
         return supervisorId;
+    }
+
+    public void setSupervisorId(Long supervisorId) {
+        this.supervisorId = supervisorId;
     }
 
     public String getSupervisorCode() {
@@ -76,12 +89,28 @@ public class Supervisor {
         this.user = user;
     }
 
+    public Branch getBranch() {
+        return branch;
+    }
+
+    public void setBranch(Branch branch) {
+        this.branch = branch;
+    }
+
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
 
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
     public LocalDateTime getUpdatedAt() {
         return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
     }
 
     @PrePersist

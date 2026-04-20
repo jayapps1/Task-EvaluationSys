@@ -1,0 +1,668 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Staff Dashboard - Task Evaluation System</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+
+    <link rel="stylesheet" th:href="@{/css/styles.css}">
+    <link rel="stylesheet" th:href="@{/css/quries.css}">
+
+    <style>
+        /* Color Variables */
+        :root {
+            --deep-navy: #161E54;
+            --light-blue: #BBE0EF;
+            --soft-orange: #FF986A;
+            --vibrant-orange: #F16D34;
+            --white: #FFFFFF;
+            --dark-gray: #6C757D;
+            --success-green: #2ECC71;
+            --error-red: #E76F51;
+            --warning-yellow: #F1C40F;
+        }
+
+        body {
+            background-color: var(--light-blue);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+        }
+
+        .dashboard-container {
+            padding: 20px;
+            margin-top: 70px;
+        }
+
+        .stats-card {
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+            cursor: pointer;
+            border: none;
+            margin-bottom: 20px;
+        }
+
+        .stats-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stats-card.total {
+            background: linear-gradient(135deg, var(--deep-navy), #2a3f8a);
+            color: white;
+        }
+
+        .stats-card.pending {
+            background: linear-gradient(135deg, var(--vibrant-orange), #ff8c42);
+            color: white;
+        }
+
+        .stats-card.progress {
+            background: linear-gradient(135deg, var(--soft-orange), #ffb347);
+            color: white;
+        }
+
+        .stats-card.completed {
+            background: linear-gradient(135deg, var(--success-green), #3ae374);
+            color: white;
+        }
+
+        .task-card {
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+            margin-bottom: 20px;
+            border: none;
+            background: var(--white);
+        }
+
+        .task-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 15px rgba(0,0,0,0.2);
+        }
+
+        .status-badge {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .status-ASSIGNED {
+            background-color: var(--vibrant-orange);
+            color: white;
+        }
+        .status-INITIATED {
+            background-color: var(--soft-orange);
+            color: white;
+        }
+        .status-IN_PROGRESS {
+            background-color: var(--deep-navy);
+            color: white;
+        }
+        .status-PENDING_REVIEW {
+            background-color: var(--warning-yellow);
+            color: #333;
+        }
+        .status-APPROVED {
+            background-color: var(--success-green);
+            color: white;
+        }
+
+        .btn-primary {
+            background-color: var(--deep-navy);
+            border-color: var(--deep-navy);
+        }
+
+        .btn-primary:hover {
+            background-color: #0f1442;
+        }
+
+        .btn-secondary {
+            background-color: var(--soft-orange);
+            border-color: var(--soft-orange);
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background-color: #e87a4a;
+        }
+
+        .btn-success {
+            background-color: var(--success-green);
+            border-color: var(--success-green);
+        }
+
+        .btn-warning {
+            background-color: var(--warning-yellow);
+            border-color: var(--warning-yellow);
+            color: #333;
+        }
+
+        .btn-task {
+            border-radius: 20px;
+            padding: 5px 15px;
+            margin: 0 5px;
+            font-size: 13px;
+        }
+
+        .header-staff {
+            background: var(--white);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .header-staff h2 {
+            color: var(--deep-navy);
+        }
+
+        .overdue-badge {
+            background-color: var(--error-red);
+            color: white;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .filter-btn, .quarter-filter {
+            border-radius: 20px;
+            padding: 8px 20px;
+            margin: 0 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background-color: var(--white);
+            color: var(--deep-navy);
+            border: 1px solid var(--deep-navy);
+        }
+
+        .filter-btn:hover, .quarter-filter:hover {
+            background-color: var(--deep-navy);
+            color: white;
+        }
+
+        .filter-btn.active, .quarter-filter.active {
+            background-color: var(--deep-navy);
+            color: white;
+        }
+
+        .search-box {
+            border-radius: 25px;
+            padding: 10px 20px;
+            border: 1px solid var(--dark-gray);
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 50px;
+        }
+
+        .task-code {
+            font-family: monospace;
+            font-size: 14px;
+            font-weight: bold;
+            color: var(--deep-navy);
+        }
+
+        .deadline-warning {
+            color: var(--error-red);
+            font-weight: bold;
+        }
+
+        .deadline-normal {
+            color: var(--success-green);
+        }
+
+        .text-primary-custom {
+            color: var(--deep-navy);
+        }
+
+        .text-secondary-custom {
+            color: var(--dark-gray);
+        }
+
+        .alert-warning-custom {
+            background-color: var(--vibrant-orange);
+            color: white;
+            border: none;
+        }
+
+        .filter-section {
+            background: var(--white);
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .filter-label {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: var(--deep-navy);
+        }
+
+        .supervisor-box {
+            background: linear-gradient(135deg, var(--deep-navy), #2a3f8a);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 12px;
+            margin-left: 400px;
+            margin-bottom: 20px;
+            display: block;        /* 👈 change from inline-block */
+            width: fit-content;    /* 👈 keeps it compact */
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+<div th:replace="~{layout/staff/navbar :: navbar}"></div>
+
+<div class="row align-items-center">
+
+    <!-- LEFT COLUMN -->
+    <div class="col-md-6">
+        <h2><i class="fas fa-tasks"></i> My Dashboard</h2>
+
+        <p class="text-secondary-custom mb-0">
+            Welcome back,
+            <strong class="text-primary-custom"
+                    th:text="${staff != null ? staff.firstName + ' ' + staff.otherName : 'Staff'}"></strong>
+        </p>
+
+        <small class="text-secondary-custom">
+            Staff Code:
+            <strong class="text-primary-custom" th:text="${staffCode}"></strong>
+        </small>
+
+        <!-- SUPERVISOR -->
+        <div class="d-flex justify-content-center">
+            <div class="supervisor-box mt-2 text-center">
+                <div>
+                    <i class="fas fa-user-tie"></i>
+                    Supervisor:
+                    <strong th:text="${supervisor.name}">Supervisor Name</strong>
+                </div>
+                <div>
+                    <i class="fas fa-phone"></i>
+                    Phone:
+                    <span th:text="${supervisor.phone}">0000000000</span>
+                </div>
+            </div>
+        </div>
+    </div> <!-- ✅ CLOSE FIRST COLUMN -->
+
+    <!-- RIGHT COLUMN -->
+    <div class="col-md-6 text-end">
+        <div class="input-group" style="max-width: 300px; margin-left: auto;">
+            <input type="text" id="searchTaskInput" class="form-control search-box" placeholder="Search by Task Code...">
+            <button class="btn btn-primary" id="searchTaskBtn">
+                <i class="fas fa-search"></i>
+            </button>
+        </div>
+    </div>
+
+</div>        <!-- Statistics Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card stats-card total">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="fas fa-chart-line"></i> Total Tasks</h5>
+                        <h2 th:text="${statistics.totalTasks}">0</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stats-card pending">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="fas fa-hourglass-half"></i> Pending</h5>
+                        <h2 th:text="${statistics.pendingTasks}">0</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stats-card progress">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="fas fa-spinner"></i> In Progress</h5>
+                        <h2 th:text="${statistics.inProgressTasks}">0</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stats-card completed">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="fas fa-check-circle"></i> Completed</h5>
+                        <h2 th:text="${statistics.completedTasks}">0</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Overdue Alert -->
+        <div th:if="${overdueCount > 0}" class="alert alert-warning-custom alert-dismissible fade show mb-4" role="alert">
+            <i class="fas fa-exclamation-triangle"></i>
+            <strong>Attention!</strong> You have <strong th:text="${overdueCount}"></strong> overdue task(s)!
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+        </div>
+
+        <!-- Filter Section -->
+        <div class="filter-section">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="filter-label"><i class="fas fa-filter"></i> Filter by Status:</div>
+                    <div class="btn-group flex-wrap">
+                        <button class="btn filter-btn active" data-filter="ALL">All</button>
+                        <button class="btn filter-btn" data-filter="ASSIGNED">Assigned</button>
+                        <button class="btn filter-btn" data-filter="INITIATED">Initiated</button>
+                        <button class="btn filter-btn" data-filter="IN_PROGRESS">In Progress</button>
+                        <button class="btn filter-btn" data-filter="PENDING_REVIEW">Pending Review</button>
+                        <button class="btn filter-btn" data-filter="APPROVED">Approved</button>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="filter-label"><i class="fas fa-calendar-alt"></i> Filter by Quarter:</div>
+                    <div class="btn-group flex-wrap">
+                        <button class="btn quarter-filter active" data-quarter="ALL">All Quarters</button>
+                        <button class="btn quarter-filter" data-quarter="Q1">Q1</button>
+                        <button class="btn quarter-filter" data-quarter="Q2">Q2</button>
+                        <button class="btn quarter-filter" data-quarter="Q3">Q3</button>
+                        <button class="btn quarter-filter" data-quarter="Q4">Q4</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Spinner -->
+        <div class="loading" id="loadingSpinner">
+            <div class="spinner-border text-primary-custom" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="text-primary-custom">Loading tasks...</p>
+        </div>
+
+        <!-- Tasks Grid -->
+        <div class="row" id="tasksContainer">
+            <div th:each="task : ${tasks}" class="col-md-6 col-lg-4 task-item mb-3"
+                 th:data-status="${task.taskStatus}"
+                 th:data-quarter="${task.quarter}">
+                <div class="card task-card h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <div>
+                                <h6 class="task-code" th:text="${task.taskCode}">TSK/24/001</h6>
+                                <small class="text-secondary-custom" th:text="${task.description}">Task Description</small>
+                            </div>
+                            <span class="status-badge" th:classappend="'status-' + ${task.taskStatus}"
+                                  th:text="${task.taskStatus}">ASSIGNED</span>
+                        </div>
+
+                        <div class="mb-2">
+                            <small class="text-secondary-custom">
+                                <i class="fas fa-calendar-alt"></i> Created:
+                                <span th:text="${#temporals.format(task.createdAt, 'yyyy-MM-dd')}"></span>
+                            </small>
+                        </div>
+
+                        <div th:if="${task.deadline}" class="mb-2">
+                            <small th:classappend="${task.deadline != null && #temporals.createNow().isAfter(task.deadline) && task.taskStatus.name() != 'APPROVED'} ? 'deadline-warning' : 'deadline-normal'">
+                                <i class="fas fa-hourglass-end"></i> Deadline:
+                                <span th:text="${#temporals.format(task.deadline, 'yyyy-MM-dd HH:mm')}"></span>
+                                <span th:if="${task.deadline != null && #temporals.createNow().isAfter(task.deadline) && task.taskStatus.name() != 'APPROVED'}"
+                                      class="overdue-badge ms-2">OVERDUE</span>
+                            </small>
+                        </div>
+
+                        <div class="mb-2" th:if="${task.quarter}">
+                            <small class="text-secondary-custom">
+                                <i class="fas fa-chart-pie"></i> Quarter:
+                                <strong class="text-primary-custom" th:text="${task.quarter}"></strong> | Year: <strong class="text-primary-custom" th:text="${task.year}"></strong>
+                            </small>
+                        </div>
+
+                        <div class="mt-3">
+                            <!-- ASSIGNED → Accept -->
+                            <button th:if="${task.taskStatus.name() == 'ASSIGNED'}"
+                                    class="btn btn-primary btn-task accept-task"
+                                    th:data-task-id="${task.taskId}">
+                                <i class="fas fa-check-circle"></i> Accept Task
+                            </button>
+
+                            <!-- INITIATED → Start -->
+                            <button th:if="${task.taskStatus.name() == 'INITIATED'}"
+                                    class="btn btn-secondary btn-task start-task"
+                                    th:data-task-id="${task.taskId}">
+                                <i class="fas fa-play"></i> Start Task
+                            </button>
+
+                            <!-- IN_PROGRESS → Request Complete -->
+                            <button th:if="${task.taskStatus.name() == 'IN_PROGRESS'}"
+                                    class="btn btn-warning btn-task request-complete"
+                                    th:data-task-id="${task.taskId}">
+                                <i class="fas fa-check-double"></i> Request Complete
+                            </button>
+
+                            <!-- PENDING_REVIEW → Waiting Badge -->
+                            <span th:if="${task.taskStatus.name() == 'PENDING_REVIEW'}"
+                                  class="badge bg-warning text-dark p-2">
+                                <i class="fas fa-hourglass-half"></i> Waiting for Approval
+                            </span>
+
+                            <!-- View Details -->
+                            <button class="btn btn-info btn-task view-details"
+                                    th:data-task-id="${task.taskId}"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#taskDetailModal">
+                                <i class="fas fa-info-circle"></i> Details
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div th:if="${tasks.isEmpty()}" class="col-12">
+                <div class="alert alert-info text-center">
+                    <i class="fas fa-info-circle fa-2x text-primary-custom"></i>
+                    <h5>No tasks assigned</h5>
+                    <p>You don't have any tasks at the moment.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Task Detail Modal -->
+<div class="modal fade" id="taskDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header" style="background-color: var(--deep-navy); color: white;">
+                <h5 class="modal-title"><i class="fas fa-tasks"></i> Task Details</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="modalTaskContent">
+                <div class="text-center">
+                    <div class="spinner-border text-primary-custom" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+    $(document).ready(function() {
+        let currentStatusFilter = 'ALL';
+        let currentQuarterFilter = 'ALL';
+
+        // Apply filters
+        function applyFilters() {
+            $('.task-item').each(function() {
+                let $task = $(this);
+                let taskStatus = $task.data('status');
+                let taskQuarter = $task.data('quarter');
+                let statusMatch = (currentStatusFilter === 'ALL' || taskStatus === currentStatusFilter);
+                let quarterMatch = (currentQuarterFilter === 'ALL' || taskQuarter === currentQuarterFilter);
+                $task.toggle(statusMatch && quarterMatch);
+            });
+            $('.no-tasks-message').remove();
+            if ($('.task-item:visible').length === 0) {
+                $('#tasksContainer').append(`
+                    <div class="col-12 no-tasks-message">
+                        <div class="alert alert-info text-center">
+                            <i class="fas fa-filter fa-2x text-primary-custom"></i>
+                            <h5>No tasks match your filters</h5>
+                        </div>
+                    </div>
+                `);
+            }
+        }
+
+        $('.filter-btn').click(function() {
+            $('.filter-btn').removeClass('active');
+            $(this).addClass('active');
+            currentStatusFilter = $(this).data('filter');
+            applyFilters();
+        });
+
+        $('.quarter-filter').click(function() {
+            $('.quarter-filter').removeClass('active');
+            $(this).addClass('active');
+            currentQuarterFilter = $(this).data('quarter');
+            applyFilters();
+        });
+
+        // Accept Task
+        $('.accept-task').click(function() {
+            let taskId = $(this).data('task-id');
+            Swal.fire({
+                title: 'Accept Task?',
+                text: 'Are you sure you want to accept this task?',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#161E54',
+                confirmButtonText: 'Yes, accept it!'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    $.post(`/staff/task/${taskId}/accept`, function(response) {
+                        if (response.status === 'success') {
+                            Swal.fire('Accepted!', response.message, 'success');
+                            setTimeout(() => location.reload(), 1500);
+                        } else {
+                            Swal.fire('Error!', response.message, 'error');
+                        }
+                    }).fail(() => Swal.fire('Error!', 'Failed to accept task', 'error'));
+                }
+            });
+        });
+
+        // Start Task
+        $('.start-task').click(function() {
+            let taskId = $(this).data('task-id');
+            Swal.fire({
+                title: 'Start Task?',
+                text: 'Are you ready to start working?',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#161E54',
+                confirmButtonText: 'Yes, start now!'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    $.post(`/staff/task/${taskId}/start`, function(response) {
+                        if (response.status === 'success') {
+                            Swal.fire('Started!', response.message, 'success');
+                            setTimeout(() => location.reload(), 1500);
+                        } else {
+                            Swal.fire('Error!', response.message, 'error');
+                        }
+                    }).fail(() => Swal.fire('Error!', 'Failed to start task', 'error'));
+                }
+            });
+        });
+
+        // Request Complete (Send for Supervisor Approval)
+        $('.request-complete').click(function() {
+            let taskId = $(this).data('task-id');
+            Swal.fire({
+                title: 'Request Completion?',
+                text: 'Submit this task for supervisor review?',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#F16D34',
+                confirmButtonText: 'Yes, submit!'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    $.post(`/staff/task/${taskId}/request-complete`, function(response) {
+                        if (response.status === 'success') {
+                            Swal.fire('Submitted!', response.message, 'success');
+                            setTimeout(() => location.reload(), 1500);
+                        } else {
+                            Swal.fire('Error!', response.message, 'error');
+                        }
+                    }).fail(() => Swal.fire('Error!', 'Failed to submit task', 'error'));
+                }
+            });
+        });
+
+        // View Details
+        $('.view-details').click(function() {
+            let taskId = $(this).data('task-id');
+            let taskCard = $(this).closest('.task-card');
+            $('#modalTaskContent').html(`
+                <table class="table table-bordered">
+                    <tr><th>Task Code:</th><td>${taskCard.find('.task-code').text()}</td></tr>
+                    <tr><th>Description:</th><td>${taskCard.find('.text-secondary-custom').first().text()}</td></tr>
+                    <tr><th>Status:</th><td>${taskCard.find('.status-badge').text()}</td></tr>
+                    <tr><th>Quarter/Year:</th><td>${taskCard.find('.text-primary-custom').first().text()}</td></tr>
+                    <tr><th>Created:</th><td>${taskCard.find('small:contains("Created")').text().replace('Created:', '')}</td></tr>
+                    <tr><th>Deadline:</th><td>${taskCard.find('small:contains("Deadline")').text().replace('Deadline:', '') || 'N/A'}</td></tr>
+                </table>
+            `);
+            new bootstrap.Modal(document.getElementById('taskDetailModal')).show();
+        });
+
+        // Search
+        $('#searchTaskBtn').click(function() {
+            let taskCode = $('#searchTaskInput').val().trim();
+            if (!taskCode) return Swal.fire('Info', 'Enter a task code', 'info');
+            $('#loadingSpinner').show();
+            $.get(`/staff/search`, { taskCode: taskCode }, function(task) {
+                $('#loadingSpinner').hide();
+                if (task) {
+                    $('.task-item').hide();
+                    $(`.task-item:has(.task-code:contains('${taskCode}'))`).show();
+                    Swal.fire('Found!', `Task ${taskCode} found`, 'success');
+                }
+            }).fail(() => {
+                $('#loadingSpinner').hide();
+                Swal.fire('Not Found', `No task found with code: ${taskCode}`, 'error');
+            });
+        });
+
+        $('#searchTaskInput').on('input', function() {
+            if ($(this).val().trim() === '') {
+                $('.task-item').show();
+                currentStatusFilter = 'ALL';
+                currentQuarterFilter = 'ALL';
+                $('.filter-btn').removeClass('active').filter('[data-filter="ALL"]').addClass('active');
+                $('.quarter-filter').removeClass('active').filter('[data-quarter="ALL"]').addClass('active');
+                applyFilters();
+            }
+        });
+    });
+</script>
+</body>
+</html>
+

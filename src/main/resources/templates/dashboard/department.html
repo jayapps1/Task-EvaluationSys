@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Department Management</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Bootstrap -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <!-- Select2 -->
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" th:href="@{/css/styles.css}">
+    <link rel="stylesheet" th:href="@{/css/quries.css}">
+    <style>
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+        }
+        .gradient-title {
+            background: linear-gradient(90deg, #4e73df, #1cc88a);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+    </style>
+</head>
+<body class="p-4">
+<div class="container">
+
+    <!-- Title + Home Button -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="text-center fw-bold gradient-title flex-grow-1 mb-0">
+            🏬 Department Management
+        </h2>
+        <a href="/admin/dashboard" class="btn btn-secondary ms-3">⬅ Back Home</a>
+    </div>
+
+    <!-- FORM -->
+    <form id="departmentForm" class="mb-4">
+        <input type="hidden" id="departmentCode">
+        <div class="row g-2">
+            <div class="col-md-4">
+                <input type="text" id="departmentName" class="form-control" placeholder="Department Name" required>
+            </div>
+            <div class="col-md-4">
+                <select id="branch" class="form-control" required></select>
+            </div>
+            <div class="col-md-4">
+                <button type="submit" class="btn btn-success w-100">Save / Update</button>
+            </div>
+        </div>
+    </form>
+
+    <!-- SEARCH -->
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <input type="text" id="searchCode" class="form-control" placeholder="Search by Department Code (e.g. FIN001)">
+        </div>
+        <div class="col-md-2">
+            <button class="btn btn-primary w-100" onclick="searchDepartment()">Search</button>
+        </div>
+        <div class="col-md-2">
+            <button class="btn btn-secondary w-100" onclick="resetSearch()">Reset</button>
+        </div>
+    </div>
+
+    <!-- TABLE -->
+    <table class="table table-bordered">
+        <thead>
+        <tr>
+            <th>Code</th>
+            <th>Name</th>
+            <th>Branch</th>
+            <th>Actions</th>
+        </tr>
+        </thead>
+        <tbody id="departmentTable"></tbody>
+    </table>
+</div>
+
+<!-- VIEW MODAL -->
+<div class="modal fade" id="viewModal" tabindex="-1" aria-labelledby="viewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="viewModalLabel">Department Details</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p><strong>Code:</strong> <span id="viewCode"></span></p>
+                <p><strong>Name:</strong> <span id="viewName"></span></p>
+                <p><strong>Branch:</strong> <span id="viewBranch"></span></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+    const API = "/departments";
+    const BRANCH_API = "/branches";
+
+    $(document).ready(function () {
+        $('#branch').select2({ placeholder: "Select Branch", width: '100%' });
+        loadBranches();
+        loadDepartments();
+    });
+
+    // Toast
+    function showToast(message, type="success") {
+        const bg = type==="error" ? "bg-danger" : "bg-success";
+        const toast = `<div class="toast text-white ${bg} show mb-2">
+                    <div class="d-flex">
+                        <div class="toast-body">${message}</div>
+                        <button class="btn-close btn-close-white me-2 m-auto"
+                            onclick="$(this).closest('.toast').remove()"></button>
+                    </div>
+                  </div>`;
+        $("#toastContainer").append(toast);
+        setTimeout(() => { $("#toastContainer .toast").first().remove(); }, 3000);
+    }
+
+    // Load Branches
+    function loadBranches() {
+        $.get(BRANCH_API).done(data => {
+            let options = `<option></option>`;
+            data.forEach(b => { options += `<option value="${b.branchCode}">${b.branchName}</option>`; });
+            $("#branch").html(options);
+        }).fail(() => showToast("Failed to load branches", "error"));
+    }
+
+    // Load Departments
+    function loadDepartments() {
+        $.get(API).done(data => {
+            let rows = "";
+            data.forEach(d => {
+                const branchName = d.branch ? d.branch.branchName : "";
+                rows += `<tr>
+                        <td>${d.departmentCode}</td>
+                        <td>${d.departmentName}</td>
+                        <td>${branchName}</td>
+                        <td>
+                            <button class="btn btn-info btn-sm me-1" onclick="editDepartment('${d.departmentCode}')">Edit</button>
+                            <button class="btn btn-danger btn-sm me-1" onclick="deleteDepartment('${d.departmentCode}')">Delete</button>
+                            <button class="btn btn-warning btn-sm" onclick="viewDepartment('${d.departmentCode}')">View</button>
+                        </td>
+                     </tr>`;
+            });
+            $("#departmentTable").html(rows);
+        }).fail(() => showToast("Failed to load departments", "error"));
+    }
+
+    // Save / Update
+    $("#departmentForm").submit(function(e){
+        e.preventDefault();
+        const code = $("#departmentCode").val();
+        const data = {
+            departmentName: $("#departmentName").val().toUpperCase(),
+            branch: { branchCode: $("#branch").val() }
+        };
+        const method = code ? "PUT" : "POST";
+        const url = code ? `${API}/code/${code}` : API;
+        $.ajax({
+            url, type: method, contentType: "application/json", data: JSON.stringify(data),
+            success: () => { resetForm(); loadDepartments(); showToast("Saved successfully"); },
+            error: () => showToast("Save failed", "error")
+        });
+    });
+
+    // Edit
+    function editDepartment(code) {
+        $.get(`${API}/code/${code}`).done(d => {
+            $("#departmentCode").val(d.departmentCode);
+            $("#departmentName").val(d.departmentName);
+            $("#branch").val(d.branch?.branchCode).trigger('change');
+        }).fail(() => showToast("Failed to load department", "error"));
+    }
+
+    // Delete
+    function deleteDepartment(code) {
+        if (!confirm("Delete this department?")) return;
+        $.ajax({ url: `${API}/code/${code}`, type: "DELETE",
+            success: () => { loadDepartments(); showToast("Deleted successfully"); },
+            error: () => showToast("Delete failed", "error")
+        });
+    }
+
+    // View Modal
+    function viewDepartment(code) {
+        $.get(`${API}/code/${code}`).done(d => {
+            $("#viewCode").text(d.departmentCode);
+            $("#viewName").text(d.departmentName);
+            $("#viewBranch").text(d.branch?.branchName || "");
+            const modal = new bootstrap.Modal(document.getElementById('viewModal'));
+            modal.show();
+        }).fail(() => showToast("Failed to load department details", "error"));
+    }
+
+    // Search
+    function searchDepartment() {
+        let code = $("#searchCode").val();
+        if (!code) { loadDepartments(); return; }
+        code = code.toUpperCase();
+        $.get(`${API}/code/${code}`).done(d => {
+            const branchName = d.branch ? d.branch.branchName : "";
+            $("#departmentTable").html(`<tr>
+            <td>${d.departmentCode}</td>
+            <td>${d.departmentName}</td>
+            <td>${branchName}</td>
+            <td>
+                <button class="btn btn-info btn-sm me-1" onclick="editDepartment('${d.departmentCode}')">Edit</button>
+                <button class="btn btn-danger btn-sm me-1" onclick="deleteDepartment('${d.departmentCode}')">Delete</button>
+                <button class="btn btn-warning btn-sm" onclick="viewDepartment('${d.departmentCode}')">View</button>
+            </td>
+        </tr>`);
+        }).fail(() => showToast("Department not found", "error"));
+    }
+
+    function resetForm() {
+        $("#departmentForm")[0].reset();
+        $("#branch").val(null).trigger('change');
+        $("#departmentCode").val("");
+    }
+    function resetSearch() {
+        $("#searchCode").val("");
+        loadDepartments();
+    }
+</script>
+</body>
+</html>

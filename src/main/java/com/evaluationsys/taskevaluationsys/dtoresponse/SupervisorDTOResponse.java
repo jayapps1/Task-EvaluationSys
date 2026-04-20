@@ -8,9 +8,11 @@ public class SupervisorDTOResponse {
     private String supervisorCode;
 
     private Long departmentId;
+    private String departmentCode;
     private String departmentName;
 
     private Long branchId;
+    private String branchCode;
     private String branchName;
 
     private Long staffId;
@@ -18,8 +20,16 @@ public class SupervisorDTOResponse {
     private String firstName;
     private String otherName;
 
+    // ✅ ADDED: Supervisor contact info (from User entity)
+    private String supervisorPhone;
+    private String supervisorEmail;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    // =========================
+    // Getters and Setters
+    // =========================
 
     public Long getSupervisorId() {
         return supervisorId;
@@ -45,6 +55,14 @@ public class SupervisorDTOResponse {
         this.departmentId = departmentId;
     }
 
+    public String getDepartmentCode() {
+        return departmentCode;
+    }
+
+    public void setDepartmentCode(String departmentCode) {
+        this.departmentCode = departmentCode;
+    }
+
     public String getDepartmentName() {
         return departmentName;
     }
@@ -59,6 +77,14 @@ public class SupervisorDTOResponse {
 
     public void setBranchId(Long branchId) {
         this.branchId = branchId;
+    }
+
+    public String getBranchCode() {
+        return branchCode;
+    }
+
+    public void setBranchCode(String branchCode) {
+        this.branchCode = branchCode;
     }
 
     public String getBranchName() {
@@ -99,6 +125,26 @@ public class SupervisorDTOResponse {
 
     public void setOtherName(String otherName) {
         this.otherName = otherName;
+    }
+
+    // =========================
+    // NEW GETTERS (SUPERVISOR INFO)
+    // =========================
+
+    public String getSupervisorPhone() {
+        return supervisorPhone;
+    }
+
+    public void setSupervisorPhone(String supervisorPhone) {
+        this.supervisorPhone = supervisorPhone;
+    }
+
+    public String getSupervisorEmail() {
+        return supervisorEmail;
+    }
+
+    public void setSupervisorEmail(String supervisorEmail) {
+        this.supervisorEmail = supervisorEmail;
     }
 
     public LocalDateTime getCreatedAt() {

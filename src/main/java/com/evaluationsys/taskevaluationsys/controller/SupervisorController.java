@@ -3,11 +3,14 @@ package com.evaluationsys.taskevaluationsys.controller;
 import com.evaluationsys.taskevaluationsys.dto.SupervisorDTO;
 import com.evaluationsys.taskevaluationsys.dtoresponse.SupervisorDTOResponse;
 import com.evaluationsys.taskevaluationsys.service.SupervisorService;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.util.List;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/supervisors")
@@ -19,45 +22,82 @@ public class SupervisorController {
         this.supervisorService = supervisorService;
     }
 
+    // ------------------------------
     // GET ALL SUPERVISORS
+    // ------------------------------
     @GetMapping
     public ResponseEntity<List<SupervisorDTOResponse>> getAllSupervisors() {
         return ResponseEntity.ok(supervisorService.getAllSupervisors());
     }
 
-    // GET SUPERVISOR BY CODE
-    @GetMapping("/by-code")
-    public ResponseEntity<SupervisorDTOResponse> getSupervisorByCode(@RequestParam String supervisorCode) {
+    // ------------------------------
+    // GET BY CODE (SAFE)
+    // ------------------------------
+    @GetMapping("/{supervisorCode:.+}")
+    public ResponseEntity<SupervisorDTOResponse> getSupervisorByCode(
+            @PathVariable String supervisorCode) {
+
         return supervisorService.getSupervisorByCode(supervisorCode)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // CREATE SUPERVISOR
+    // ------------------------------
+    // CREATE
+    // ------------------------------
     @PostMapping
-    public ResponseEntity<SupervisorDTOResponse> createSupervisor(@RequestBody SupervisorDTO dto) {
-        SupervisorDTOResponse response = supervisorService.createSupervisor(dto);
+    public ResponseEntity<SupervisorDTOResponse> createSupervisor(
+            @Valid @RequestBody SupervisorDTO dto) {
 
-        return ResponseEntity
-                .created(URI.create("/supervisors/by-code?supervisorCode=" + response.getSupervisorCode()))
+        SupervisorDTOResponse response =
+                supervisorService.createSupervisorByCodes(dto);
+
+        return ResponseEntity.created(
+                        URI.create("/supervisors/" + response.getSupervisorCode()))
                 .body(response);
     }
 
-    // UPDATE SUPERVISOR
-    @PutMapping("/update")
+    // ------------------------------
+    // UPDATE (FULL FIX FOR SLASHES)
+    // ------------------------------
+    @PutMapping("/**")
     public ResponseEntity<SupervisorDTOResponse> updateSupervisor(
-            @RequestParam String supervisorCode,
-            @RequestBody SupervisorDTO dto) {
+            HttpServletRequest request,
+            @Valid @RequestBody SupervisorDTO dto) {
 
-        return supervisorService.updateSupervisor(supervisorCode, dto)
+        String supervisorCode = extractSupervisorCode(request);
+
+        return supervisorService.updateSupervisorByCodes(supervisorCode, dto)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // DELETE SUPERVISOR
-    @DeleteMapping("/delete")
-    public ResponseEntity<Void> deleteSupervisor(@RequestParam String supervisorCode) {
-        supervisorService.deleteSupervisor(supervisorCode);
-        return ResponseEntity.noContent().build();
+    // ------------------------------
+    // DELETE (FULL FIX FOR SLASHES)
+    // ------------------------------
+    @DeleteMapping("/**")
+    public ResponseEntity<String> deleteSupervisor(HttpServletRequest request) {
+
+        String supervisorCode = extractSupervisorCode(request);
+
+        Optional<SupervisorDTOResponse> supervisor =
+                supervisorService.getSupervisorByCode(supervisorCode);
+
+        if (supervisor.isPresent()) {
+            supervisorService.deleteSupervisorByCode(supervisorCode);
+            return ResponseEntity.ok("Supervisor deleted successfully");
+        } else {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    // ------------------------------
+    // HELPER METHOD (CRITICAL)
+    // ------------------------------
+    private String extractSupervisorCode(HttpServletRequest request) {
+        String path = request.getRequestURI();
+
+        // Extract everything after "/supervisors/"
+        return path.substring(path.indexOf("/supervisors/") + 13);
     }
 }

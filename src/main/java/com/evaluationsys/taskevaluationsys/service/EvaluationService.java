@@ -121,7 +121,7 @@ public class EvaluationService {
 
         response.setEvaluationId(evaluation.getEvaluationId());
         response.setEvaluationCode(evaluation.getEvaluationCode());
-        response.setTask_id(evaluation.getTask().getTask_id());
+        response.setTaskId(evaluation.getTask().getTaskId());
         response.setSupervisorId(evaluation.getSupervisor().getSupervisorId());
         response.setScore(evaluation.getScore());
         response.setRemarks(evaluation.getRemarks());

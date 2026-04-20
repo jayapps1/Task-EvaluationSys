@@ -1,0 +1,20 @@
+/* Responsive Adjustments login */
+@media(max-width: 900px) {
+    .login-wrapper {
+        flex-direction: column;
+        max-width: 100%;
+        min-width: unset;
+    }
+
+    .welcome-panel {
+        border-radius: 12px 12px 0 0;
+    }
+
+    .login-card {
+        border-radius: 0 0 12px 12px;
+    }
+
+    .animated-line {
+        display: none; /* optional on mobile */
+    }
+}

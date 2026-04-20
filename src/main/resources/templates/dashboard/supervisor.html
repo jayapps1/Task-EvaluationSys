@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Supervisor Management</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <link rel="stylesheet" th:href="@{/css/styles.css}">
+    <link rel="stylesheet" th:href="@{/css/quries.css}">
+    <style>
+        .toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; }
+        .select2-container { width: 100% !important; }
+    </style>
+</head>
+<body class="p-4">
+<div class="container">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold flex-grow-1 mb-0 text-center">🧑‍💼 Supervisor Management</h2>
+        <a href="/admin/dashboard" class="btn btn-secondary ms-3">⬅ Back Home</a>
+    </div>
+
+    <!-- FORM -->
+    <form id="supervisorForm" class="mb-4">
+        <input type="hidden" id="supervisorCode">
+
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label fw-semibold">Branch</label>
+                <select id="branch" class="form-control" required></select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label fw-semibold">Department</label>
+                <select id="department" class="form-control" required></select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label fw-semibold">Supervisor</label>
+                <select id="supervisorSelect" class="form-control" required></select>
+            </div>
+        </div>
+
+        <div class="row mt-3 g-2">
+            <div class="col-md-4">
+                <button type="submit" class="btn btn-success w-100">Save / Update</button>
+            </div>
+            <div class="col-md-4">
+                <button type="button" id="resetBtn" class="btn btn-warning w-100">Reset</button>
+            </div>
+        </div>
+    </form>
+
+    <!-- SEARCH -->
+    <div class="mb-3">
+        <label class="form-label fw-semibold">Search Supervisor</label>
+        <input type="text" id="searchSupervisor" class="form-control" placeholder="Search by Code...">
+    </div>
+
+    <!-- TABLE -->
+    <table class="table table-bordered table-hover">
+        <thead class="table-light">
+        <tr>
+            <th>Supervisor Code</th>
+            <th>Supervisor</th>
+            <th>Department</th>
+            <th>Branch</th>
+            <th>Created Date</th>
+            <th>Actions</th>
+        </tr>
+        </thead>
+        <tbody id="supervisorTable"></tbody>
+    </table>
+</div>
+
+<!-- DELETE MODAL -->
+<div class="modal fade" id="deleteModal">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5>Confirm Delete</h5>
+                <button class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">Delete this supervisor record?</div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button id="confirmDeleteBtn" class="btn btn-danger">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- VIEW MODAL -->
+<div class="modal fade" id="viewModal">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5>Supervisor Details</h5>
+                <button class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p><strong>Code:</strong> <span id="viewCode"></span></p>
+                <p><strong>Supervisor:</strong> <span id="viewSupervisorName"></span></p>
+                <p><strong>Department:</strong> <span id="viewDepartment"></span></p>
+                <p><strong>Branch:</strong> <span id="viewBranch"></span></p>
+                <p><strong>Created:</strong> <span id="viewCreatedAt"></span></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    const API = "/supervisors";
+    const BRANCH_API = "/branches";
+    const DEPARTMENT_API = "/departments";
+    const USER_API = "/users/fetchAllUsers";
+
+    let allSupervisors = [];
+    let allBranches = [];
+    let allDepartments = [];
+
+    $(document).ready(function () {
+        $('#branch, #department, #supervisorSelect').select2({ width: '100%' });
+
+        Promise.all([
+            loadBranches(),
+            loadDepartments(),
+            loadSupervisorsDropdown()
+        ]).then(() => {
+            loadSupervisors();
+        });
+
+        $('#branch').on('change', function() {
+            filterDepartments($(this).val());
+        });
+
+        $("#searchSupervisor").on("input", function() {
+            const q = $(this).val().toLowerCase();
+            const filtered = allSupervisors.filter(s =>
+                s.supervisorCode?.toLowerCase().includes(q)
+            );
+            renderSupervisors(filtered);
+        });
+
+        $("#supervisorForm").submit(function(e){
+            e.preventDefault();
+            saveSupervisor();
+        });
+
+        $("#resetBtn").click(resetForm);
+    });
+
+    function resetForm() {
+        $("#supervisorForm")[0].reset();
+        $('#branch, #department, #supervisorSelect').val(null).trigger('change');
+        $("#supervisorCode").val('');
+    }
+
+    function loadBranches() {
+        return $.get(BRANCH_API).done(data => {
+            allBranches = data;
+            $("#branch").html('<option value="">Select Branch</option>' +
+                data.map(b => `<option value="${b.branchCode}">${b.branchName}</option>`).join(''));
+        });
+    }
+
+    function loadDepartments() {
+        return $.get(DEPARTMENT_API).done(data => {
+            allDepartments = data;
+            $("#department").html('<option value="">Select Department</option>');
+        });
+    }
+
+    function filterDepartments(branchCode) {
+        let options = '<option value="">Select Department</option>';
+
+        const filtered = branchCode
+            ? allDepartments.filter(d => d.branch?.branchCode === branchCode)
+            : allDepartments;
+
+        filtered.forEach(d => {
+            options += `<option value="${d.departmentCode}">${d.departmentName}</option>`;
+        });
+
+        $("#department").html(options).trigger('change');
+    }
+
+    function loadSupervisorsDropdown() {
+        return $.get(USER_API).done(data => {
+            const supervisors = data.filter(u => u.role === "SUPERVISOR");
+
+            let options = '<option value="">Select Supervisor</option>';
+            supervisors.forEach(s => {
+                options += `<option value="${s.staffId}">
+                    ${s.firstName} ${s.otherName || ''}
+                </option>`;
+            });
+
+            $("#supervisorSelect").html(options).trigger('change');
+        });
+    }
+
+    function loadSupervisors() {
+        $.get(API).done(data => {
+            allSupervisors = data;
+            renderSupervisors(allSupervisors);
+        }).fail(() => showToast("Error loading supervisors", "error"));
+    }
+
+    function renderSupervisors(supervisors) {
+        if (!supervisors || supervisors.length === 0) {
+            $("#supervisorTable").html(`
+                <tr><td colspan="6" class="text-center text-muted">
+                    No supervisors found
+                </td></tr>`);
+            return;
+        }
+
+        let rows = "";
+        supervisors.forEach(s => {
+            rows += `<tr>
+                <td>${s.supervisorCode || 'N/A'}</td>
+                <td>${s.firstName || ''} ${s.otherName || ''}</td>
+                <td>${s.departmentName || 'N/A'}</td>
+                <td>${s.branchName || 'N/A'}</td>
+                <td>${s.createdAt ? new Date(s.createdAt).toLocaleDateString() : 'N/A'}</td>
+                <td>
+                    <button class="btn btn-sm btn-primary" onclick="viewSupervisor('${s.supervisorCode}')">View</button>
+                    <button class="btn btn-sm btn-warning" onclick="editSupervisor('${s.supervisorCode}')">Edit</button>
+                    <button class="btn btn-sm btn-danger" onclick="openDeleteModal('${s.supervisorCode}')">Delete</button>
+                </td>
+            </tr>`;
+        });
+
+        $("#supervisorTable").html(rows);
+    }
+
+    function saveSupervisor() {
+        const branchCode = $('#branch').val();
+        const departmentCode = $('#department').val();
+        const staffId = $('#supervisorSelect').val();
+        const supervisorCode = $('#supervisorCode').val();
+
+        if (!branchCode || !departmentCode || !staffId) {
+            showToast("Fill all fields", "error");
+            return;
+        }
+
+        const data = {
+            branchCode,
+            departmentCode,
+            staffId: parseInt(staffId)
+        };
+
+        const isUpdate = supervisorCode && supervisorCode !== "";
+
+        $.ajax({
+            url: isUpdate ? `${API}/${supervisorCode}` : API,
+            type: isUpdate ? 'PUT' : 'POST',
+            contentType: "application/json",
+            data: JSON.stringify(data),
+            success: function() {
+                showToast(isUpdate ? "Updated successfully!" : "Saved successfully!", "success");
+                resetForm();
+                loadSupervisors();
+            },
+            error: function(xhr) {
+                showToast(xhr.responseText || "Error occurred", "error");
+            }
+        });
+    }
+
+    function editSupervisor(code) {
+        const s = allSupervisors.find(x => x.supervisorCode === code);
+        if (!s) return;
+
+        $('#supervisorCode').val(s.supervisorCode);
+
+        $('#branch').val(s.branchCode).trigger('change');
+
+        filterDepartments(s.branchCode);
+
+        setTimeout(() => {
+            $('#department').val(s.departmentCode).trigger('change');
+            $('#supervisorSelect').val(String(s.staffId)).trigger('change');
+        }, 100);
+
+        showToast("Edit mode: Update and click Save", "info");
+    }
+
+    function viewSupervisor(code) {
+        const s = allSupervisors.find(x => x.supervisorCode === code);
+        if (!s) return;
+
+        $('#viewCode').text(s.supervisorCode);
+        $('#viewSupervisorName').text(`${s.firstName || ''} ${s.otherName || ''}`);
+        $('#viewDepartment').text(s.departmentName || 'N/A');
+        $('#viewBranch').text(s.branchName || 'N/A');
+        $('#viewCreatedAt').text(
+            s.createdAt ? new Date(s.createdAt).toLocaleString() : 'N/A'
+        );
+
+        new bootstrap.Modal('#viewModal').show();
+    }
+
+    let supervisorToDelete = null;
+
+    function openDeleteModal(code) {
+        supervisorToDelete = code;
+        new bootstrap.Modal('#deleteModal').show();
+    }
+
+    // ✅ FIXED DELETE
+    $('#confirmDeleteBtn').click(function() {
+        if (!supervisorToDelete) return;
+
+        $.ajax({
+            url: `${API}/${supervisorToDelete}`, // ✅ CORRECT
+            type: 'DELETE',
+            success: function() {
+                showToast("Deleted successfully", "success");
+                loadSupervisors();
+                bootstrap.Modal.getInstance(document.getElementById('deleteModal')).hide();
+                supervisorToDelete = null;
+            },
+            error: function(xhr) {
+                showToast(xhr.responseText || "Error deleting supervisor", "error");
+            }
+        });
+    });
+
+    function showToast(msg, type='success') {
+        const bgColor = type === 'success' ? '#161E54' : '#E76F51';
+
+        const toast = $(`
+            <div class="toast text-white mb-2" style="background:${bgColor}">
+                <div class="d-flex">
+                    <div class="toast-body">${msg}</div>
+                    <button class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                </div>
+            </div>
+        `);
+
+        $('#toastContainer').append(toast);
+
+        const t = new bootstrap.Toast(toast[0], { delay: 3000 });
+        t.show();
+
+        toast.on('hidden.bs.toast', () => toast.remove());
+    }
+</script>
+</body>
+</html>

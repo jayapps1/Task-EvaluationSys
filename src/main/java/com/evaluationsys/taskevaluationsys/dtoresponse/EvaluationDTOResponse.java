@@ -6,7 +6,7 @@ public class EvaluationDTOResponse {
 
     private Long evaluationId;
     private String evaluationCode;
-    private Long task_id;
+    private Long taskId;
     private Long supervisorId;
     private Double score;
     private String remarks;
@@ -30,12 +30,12 @@ public class EvaluationDTOResponse {
         this.evaluationCode = evaluationCode;
     }
 
-    public Long getTask_id() {
-        return task_id;
+    public Long getTaskId() {
+        return taskId;
     }
 
-    public void setTask_id(Long task_id) {
-        this.task_id = task_id;
+    public void setTaskId(Long taskId) {
+        this.taskId = taskId;
     }
 
     public Long getSupervisorId() {

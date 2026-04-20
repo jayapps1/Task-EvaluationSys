@@ -1,5 +1,6 @@
 package com.evaluationsys.taskevaluationsys.entity;
 
+import com.evaluationsys.taskevaluationsys.entity.enums.Role;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
@@ -22,6 +23,7 @@ public class User {
 
     @Column(unique = true, nullable = false)
     private Long staffCode;
+
     private String firstName;
     private String otherName;
     private String passwordHash;
@@ -104,8 +106,13 @@ public class User {
         this.staffId = staffId;
     }
 
-    public Long getStaffCode() {return staffCode;}
-    public void setStaffCode(Long staffCode) {this.staffCode = staffCode;}
+    public Long getStaffCode() {
+        return staffCode;
+    }
+
+    public void setStaffCode(Long staffCode) {
+        this.staffCode = staffCode;
+    }
 
     public String getFirstName() {
         return firstName;

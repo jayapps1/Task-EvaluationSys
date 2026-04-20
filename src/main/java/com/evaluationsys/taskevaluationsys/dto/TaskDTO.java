@@ -1,41 +1,60 @@
 package com.evaluationsys.taskevaluationsys.dto;
 
+import com.evaluationsys.taskevaluationsys.entity.enums.Quarter;
+import com.evaluationsys.taskevaluationsys.entity.enums.TaskStatus;
 import java.time.LocalDateTime;
 
 public class TaskDTO {
 
     private String description;
-    private String supervisorCode;     // Supervisor assigned to this task (by code)
-    private String createdByCode;      // Optional: supervisor who created this task (by code)
-    private Long departmentId;
+
+    // Changed from String to Long - now matches database
+    private Long supervisorId;  // This will be the ID from supervisor table
+
+    private Long createdByCode;  // This is the staff_code from user table (also an ID)
+
     private LocalDateTime deadline;
-    private String taskStatus;
-    private Integer quarter;
+    private TaskStatus taskStatus;
+    private Quarter quarter;
     private Integer year;
 
+    // Constructors
     public TaskDTO() {}
+
+    public TaskDTO(String description,
+                   Long supervisorId,  // Changed
+                   Long createdByCode,
+                   LocalDateTime deadline,
+                   TaskStatus taskStatus,
+                   Quarter quarter,
+                   Integer year) {
+        this.description = description;
+        this.supervisorId = supervisorId;
+        this.createdByCode = createdByCode;
+        this.deadline = deadline;
+        this.taskStatus = taskStatus;
+        this.quarter = quarter;
+        this.year = year;
+    }
 
     // Getters & Setters
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
 
-    public String getSupervisorCode() { return supervisorCode; }
-    public void setSupervisorCode(String supervisorCode) { this.supervisorCode = supervisorCode; }
+    public Long getSupervisorId() { return supervisorId; }  // Changed
+    public void setSupervisorId(Long supervisorId) { this.supervisorId = supervisorId; }  // Changed
 
-    public String getCreatedByCode() { return createdByCode; }
-    public void setCreatedByCode(String createdByCode) { this.createdByCode = createdByCode; }
-
-    public Long getDepartmentId() { return departmentId; }
-    public void setDepartmentId(Long departmentId) { this.departmentId = departmentId; }
+    public Long getCreatedByCode() { return createdByCode; }
+    public void setCreatedByCode(Long createdByCode) { this.createdByCode = createdByCode; }
 
     public LocalDateTime getDeadline() { return deadline; }
     public void setDeadline(LocalDateTime deadline) { this.deadline = deadline; }
 
-    public String getTaskStatus() { return taskStatus; }
-    public void setTaskStatus(String taskStatus) { this.taskStatus = taskStatus; }
+    public TaskStatus getTaskStatus() { return taskStatus; }
+    public void setTaskStatus(TaskStatus taskStatus) { this.taskStatus = taskStatus; }
 
-    public Integer getQuarter() { return quarter; }
-    public void setQuarter(Integer quarter) { this.quarter = quarter; }
+    public Quarter getQuarter() { return quarter; }
+    public void setQuarter(Quarter quarter) { this.quarter = quarter; }
 
     public Integer getYear() { return year; }
     public void setYear(Integer year) { this.year = year; }

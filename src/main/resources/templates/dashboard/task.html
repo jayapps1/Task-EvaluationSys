@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Task Management</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Bootstrap -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <!-- Select2 -->
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet"/>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+    <!-- CSS -->
+    <link rel="stylesheet" th:href="@{/css/styles.css}">
+    <link rel="stylesheet" th:href="@{/css/quries.css}">
+    <style>
+        .disabled-form {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .edit-disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .status-badge {
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .status-ASSIGNED { background-color: #FF986A; color: white; }
+        .status-INITIATED { background-color: #F16D34; color: white; }
+        .status-IN_PROGRESS { background-color: #161E54; color: white; }
+        .status-COMPLETED { background-color: #2ECC71; color: white; }
+        .status-APPROVED { background-color: #27ae60; color: white; }
+
+        .warning-box {
+            background-color: #FFF3CD;
+            border-left: 4px solid #FFC107;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="gradient-title text-center flex-grow-1">📋 Task Management</h2>
+        <a href="/admin/dashboard" class="btn btn-secondary ms-3">⬅ Back Home</a>
+    </div>
+
+    <div class="card p-3 mb-4" id="formCard">
+        <form id="taskForm">
+            <input type="hidden" id="taskId">
+
+            <!-- Warning message for non-editable tasks -->
+            <div id="editWarning" class="warning-box" style="display: none;">
+                <i class="fas fa-lock"></i>
+                <strong>Task Cannot Be Edited</strong><br>
+                This task has status: <span id="currentTaskStatus"></span>.
+                Tasks can only be edited when status is <strong>INITIATED</strong>.
+            </div>
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="fw-bold">Created By</label>
+                    <select id="createdByCode" class="form-control"><option></option></select>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="fw-bold">Supervisor</label>
+                    <select id="supervisorId" class="form-control"><option></option></select>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="fw-bold">Task Status</label>
+                    <select id="taskStatus" class="form-control" disabled>
+                        <option value="ASSIGNED">Assigned</option>
+                        <option value="INITIATED">Initiated</option>
+                        <option value="IN_PROGRESS">In Progress</option>
+                        <option value="COMPLETED">Completed</option>
+                        <option value="APPROVED">Approved</option>
+                    </select>
+                    <small class="text-muted">Status cannot be changed directly - updated via task workflow</small>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="fw-bold">Quarter</label>
+                    <select id="quarter" class="form-control">
+                        <option value="Q1">Q1</option>
+                        <option value="Q2">Q2</option>
+                        <option value="Q3">Q3</option>
+                        <option value="Q4">Q4</option>
+                    </select>
+                </div>
+            </div>
+
+            <input type="text" id="description" class="form-control mt-3" placeholder="Description">
+            <input type="datetime-local" id="deadline" class="form-control mt-2">
+
+            <div class="d-flex mt-3 gap-2">
+                <button type="submit" class="btn btn-primary flex-grow-1" id="saveBtn">Save</button>
+                <button type="button" id="resetBtn" class="btn btn-warning flex-grow-1">Reset</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="card p-3">
+        <input type="text" id="taskSearch" class="form-control mb-3" placeholder="Search by task code...">
+        <table class="table table-bordered table-striped">
+            <thead>
+            <tr>
+                <th>Code</th>
+                <th>Description</th>
+                <th>Supervisor</th>
+                <th>Created By</th>
+                <th>Status</th>
+                <th>Quarter</th>
+                <th>Actions</th>
+            </tr>
+            </thead>
+            <tbody id="taskTable"></tbody>
+        </table>
+        <div id="paginationContainer"></div>
+    </div>
+</div>
+
+<!-- VIEW MODAL -->
+<div class="modal fade" id="viewTaskModal">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary">
+                <h5 class="modal-title">Task Details</h5>
+                <button class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="viewTaskBody"></div>
+        </div>
+    </div>
+</div>
+
+<!-- DELETE MODAL -->
+<div class="modal fade" id="deleteTaskModal">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-danger">
+                <h5 class="modal-title">Confirm Delete</h5>
+                <button class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">Are you sure you want to delete this task?</div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-danger" id="confirmDeleteBtn">🗑 Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="toast-container position-fixed top-0 end-0 p-3"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    $(document).ready(function(){
+        $('#supervisorId, #createdByCode').select2({ placeholder:"Select", width:'100%', allowClear:true });
+
+        const API = "/tasks";
+        const USER_API = "/users/fetchAllUsers";
+        const SUPERVISOR_API = "/supervisors";
+
+        let allUsers = [];
+        let allSupervisors = [];
+        let allTasks = [];
+        let currentPage = 1;
+        let totalPages = 1;
+        let pageSize = 50;
+        let deleteId = null;
+        let currentEditTaskStatus = null;
+
+        const deleteModal = new bootstrap.Modal(document.getElementById('deleteTaskModal'));
+
+        const statusMap = {
+            "ASSIGNED": "Assigned",
+            "INITIATED": "Initiated",
+            "IN_PROGRESS": "In Progress",
+            "COMPLETED": "Completed",
+            "APPROVED": "Approved"
+        };
+
+        const quarterMap = {
+            "Q1": "Q1",
+            "Q2": "Q2",
+            "Q3": "Q3",
+            "Q4": "Q4"
+        };
+
+        function showToast(msg, type='success'){
+            const color = type === 'success' ? '#161E54' : '#E76F51';
+            const toast = $(`<div class="toast text-white mb-2" style="background:${color}"><div class="d-flex"><div class="toast-body">${msg}</div><button class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div></div>`);
+            $('.toast-container').append(toast);
+            new bootstrap.Toast(toast[0], {delay: 3000}).show();
+            toast.on('hidden.bs.toast', () => toast.remove());
+        }
+
+        // Check if task can be edited (only INITIATED status)
+        function canEditTask(taskStatus) {
+            return taskStatus === 'INITIATED';
+        }
+
+        // Enable/disable form fields based on edit permission
+        function setFormEditable(editable) {
+            const formFields = ['#description', '#deadline', '#quarter', '#supervisorId', '#createdByCode'];
+            formFields.forEach(field => {
+                $(field).prop('disabled', !editable);
+            });
+
+            // Always keep status disabled (should be managed by workflow)
+            $('#taskStatus').prop('disabled', true);
+
+            if (editable) {
+                $('#formCard').removeClass('disabled-form');
+                $('#saveBtn').prop('disabled', false).text('Save');
+                $('#editWarning').hide();
+            } else {
+                $('#formCard').addClass('disabled-form');
+                $('#saveBtn').prop('disabled', true).text('Save (Disabled)');
+                $('#editWarning').show();
+            }
+        }
+
+        // Reset form to default state
+        function resetFormToDefault() {
+            $("#taskForm")[0].reset();
+            $('#supervisorId, #createdByCode').val(null).trigger('change');
+            $("#taskStatus").val("INITIATED"); // Default to INITIATED as per your requirement
+            $("#quarter").val("Q1");
+            $("#taskId").val('');
+            currentEditTaskStatus = null;
+            setFormEditable(true); // New tasks are editable
+            $('#editWarning').hide();
+        }
+
+        function getSupervisorNameById(supervisorId){
+            if(!supervisorId || supervisorId === 'N/A' || supervisorId === 'null') return 'N/A';
+
+            const supervisorIdStr = supervisorId.toString();
+            const supervisor = allSupervisors.find(s => {
+                return s.supervisorId && s.supervisorId.toString() === supervisorIdStr;
+            });
+
+            if(supervisor) {
+                if(supervisor.user && supervisor.user.firstName) {
+                    return `${supervisor.user.firstName} ${supervisor.user.otherName || ''}`.trim();
+                }
+                if(supervisor.staffCode) {
+                    const user = allUsers.find(u => u.staffCode === supervisor.staffCode);
+                    if(user) {
+                        return `${user.firstName} ${user.otherName || ''}`.trim();
+                    }
+                }
+                return supervisor.supervisorCode || 'N/A';
+            }
+            return 'N/A';
+        }
+
+        function getUserNameByCode(code){
+            if(!code) return 'N/A';
+            const user = allUsers.find(u => u.staffCode && u.staffCode.toString() === code.toString());
+            return user ? `${user.firstName} ${user.otherName || ''}`.trim() : 'N/A';
+        }
+
+        function loadUsersAndSupervisors() {
+            console.log("Loading users and supervisors...");
+
+            return $.get(USER_API).done(data => {
+                console.log("All users loaded:", data);
+                allUsers = data;
+
+                const adminUsers = allUsers.filter(u => u.role === "ADMIN" || u.role === "admin");
+                console.log("Admin users for dropdown:", adminUsers);
+
+                $("#createdByCode").html('<option></option>' +
+                    adminUsers.map(u => `<option value="${u.staffCode}">${u.firstName} ${u.otherName || ''}</option>`).join(''));
+            }).then(() => {
+                return $.get(SUPERVISOR_API).done(data => {
+                    console.log("Supervisors loaded:", data);
+                    allSupervisors = data;
+
+                    const userMap = new Map();
+                    allUsers.forEach(u => {
+                        userMap.set(u.staffCode, `${u.firstName} ${u.otherName || ''}`.trim());
+                    });
+
+                    $("#supervisorId").html('<option></option>' +
+                        allSupervisors.map(s => {
+                            let name = '';
+                            if(s.user && s.user.firstName) {
+                                name = `${s.user.firstName} ${s.user.otherName || ''}`.trim();
+                            }
+                            else if(s.staffCode && userMap.has(s.staffCode)) {
+                                name = userMap.get(s.staffCode);
+                            }
+                            else if(s.supervisorName) {
+                                name = s.supervisorName;
+                            }
+                            else {
+                                name = s.supervisorCode;
+                            }
+                            return `<option value="${s.supervisorId}">${name}</option>`;
+                        }).join(''));
+                });
+            });
+        }
+
+        function loadTasks(page = 1){
+            console.log("Loading tasks for page:", page);
+            $.get(API + "/all", {page, pageSize}).done(data => {
+                console.log("Tasks API Response:", data);
+                allTasks = data.tasks || [];
+                totalPages = data.totalPages || 1;
+                currentPage = page;
+                renderTable();
+                renderPagination();
+            }).fail((xhr) => {
+                console.error("Failed to load tasks:", xhr);
+                showToast("Failed to load tasks: " + (xhr.responseText || "Unknown error"), "error");
+            });
+        }
+
+        function renderTable(){
+            let rows = "";
+            if(allTasks.length === 0){
+                rows = `<tr><td colspan="7" class="text-center">No tasks found</td></tr>`;
+            } else {
+                allTasks.forEach(t => {
+                    const supervisorName = getSupervisorNameById(t.supervisorCode);
+                    const createdByName = getUserNameByCode(t.createdByStaffCode);
+                    const canEdit = canEditTask(t.taskStatus);
+                    const editDisabledClass = !canEdit ? 'edit-disabled' : '';
+                    const editTitle = !canEdit ? 'Tasks can only be edited when status is INITIATED' : 'Edit task';
+
+                    rows += `<tr>
+                        <td>${t.taskCode ?? ''}</td>
+                        <td>${t.description ?? ''}</td>
+                        <td>${supervisorName}</td>
+                        <td>${createdByName}</td>
+                        <td><span class="status-badge status-${t.taskStatus}">${statusMap[t.taskStatus] ?? ''}</span></td>
+                        <td>${quarterMap[t.quarter] ?? ''}</td>
+                        <td>
+                            <button class="btn btn-primary btn-sm view-btn" data-id="${t.taskId}">View</button>
+                            <button class="btn btn-warning btn-sm edit-btn ${editDisabledClass}"
+                                    data-id="${t.taskId}"
+                                    data-status="${t.taskStatus}"
+                                    ${!canEdit ? 'disabled' : ''}
+                                    title="${editTitle}">
+                                Edit
+                            </button>
+                            <button class="btn btn-danger btn-sm delete-btn" data-id="${t.taskId}">Delete</button>
+                        </td>
+                    </tr>`;
+                });
+            }
+            $("#taskTable").html(rows);
+        }
+
+        function renderPagination(){
+            if(totalPages <= 1){
+                $("#paginationContainer").html('');
+                return;
+            }
+            let html = `<ul class="pagination justify-content-center">`;
+            for(let i = 1; i <= totalPages; i++){
+                html += `<li class="page-item ${i === currentPage ? 'active' : ''}"><a class="page-link" href="#" data-page="${i}">${i}</a></li>`;
+            }
+            html += `</ul>`;
+            $("#paginationContainer").html(html);
+        }
+
+        $("#paginationContainer").on('click', 'a.page-link', function(e){
+            e.preventDefault();
+            loadTasks($(this).data('page'));
+        });
+
+        $("#taskSearch").on("keyup", function(){
+            const q = $(this).val().trim();
+            if(!q){
+                loadTasks(1);
+                return;
+            }
+            $.get(API + "/search", {q}).done(data => {
+                allTasks = data || [];
+                renderTable();
+                $("#paginationContainer").html('');
+            }).fail(() => showToast("Search failed", "error"));
+        });
+
+        $("#taskTable").on('click', '.delete-btn', function(){
+            deleteId = $(this).data('id');
+            deleteModal.show();
+        });
+
+        $("#confirmDeleteBtn").click(function(){
+            if(!deleteId){
+                showToast("No task selected", "error");
+                return;
+            }
+            $.ajax({
+                url: `${API}/id/${deleteId}`,
+                type: "DELETE",
+                success: function(){
+                    showToast("Deleted successfully");
+                    deleteModal.hide();
+                    deleteId = null;
+                    const q = $("#taskSearch").val().trim();
+                    if(q){
+                        $.get(API + "/search", {q}).done(data => {
+                            allTasks = data || [];
+                            renderTable();
+                            $("#paginationContainer").html('');
+                        });
+                    } else {
+                        loadTasks(currentPage);
+                    }
+                },
+                error: () => showToast("Delete failed", "error")
+            });
+        });
+
+        $("#taskTable").on('click', '.view-btn', function(){
+            const t = allTasks.find(x => x.taskId == $(this).data('id'));
+            if(!t) return;
+            $("#viewTaskBody").html(`
+                <p><b>Code:</b> ${t.taskCode}</p>
+                <p><b>Description:</b> ${t.description}</p>
+                <p><b>Supervisor:</b> ${getSupervisorNameById(t.supervisorCode)}</p>
+                <p><b>Created By:</b> ${getUserNameByCode(t.createdByStaffCode)}</p>
+                <p><b>Status:</b> <span class="status-badge status-${t.taskStatus}">${statusMap[t.taskStatus] ?? ''}</span></p>
+                <p><b>Quarter:</b> ${quarterMap[t.quarter] ?? ''}</p>
+                <p><b>Deadline:</b> ${t.deadline ? t.deadline.replace('T', ' ') : 'N/A'}</p>
+            `);
+            new bootstrap.Modal(document.getElementById('viewTaskModal')).show();
+        });
+
+        $("#taskTable").on('click', '.edit-btn', function(){
+            const taskId = $(this).data('id');
+            const taskStatus = $(this).data('status');
+            const t = allTasks.find(x => x.taskId == taskId);
+
+            if(!t) return;
+
+            // Check if task can be edited
+            if (!canEditTask(taskStatus)) {
+                showToast(`Cannot edit task with status: ${statusMap[taskStatus]}. Only INITIATED tasks can be edited.`, "error");
+                return;
+            }
+
+            // Populate form for editing
+            $("#taskId").val(t.taskId);
+            $("#description").val(t.description || '');
+            $("#deadline").val(t.deadline ? t.deadline.substring(0, 16) : '');
+            $("#supervisorId").val(t.supervisorCode).trigger('change');
+            $("#createdByCode").val(t.createdByStaffCode).trigger('change');
+            $("#taskStatus").val(t.taskStatus);
+            $("#quarter").val(t.quarter);
+
+            currentEditTaskStatus = t.taskStatus;
+            setFormEditable(true);
+            $('#currentTaskStatus').text(statusMap[t.taskStatus]);
+        });
+
+        $("#taskForm").submit(function(e){
+            e.preventDefault();
+            const id = $("#taskId").val();
+            const taskStatus = $("#taskStatus").val();
+
+            // Double-check edit permission before saving
+            if (id && !canEditTask(taskStatus)) {
+                showToast(`Cannot save task with status: ${statusMap[taskStatus]}. Only INITIATED tasks can be edited.`, "error");
+                return;
+            }
+
+            const data = {
+                description: $("#description").val(),
+                supervisorId: parseInt($("#supervisorId").val()),
+                createdByCode: parseInt($("#createdByCode").val()),
+                taskStatus: taskStatus,
+                quarter: $("#quarter").val(),
+                deadline: $("#deadline").val()
+            };
+
+            console.log("Saving data:", data);
+
+            $.ajax({
+                url: id ? `${API}/id/${id}` : API,
+                type: id ? "PUT" : "POST",
+                contentType: "application/json",
+                data: JSON.stringify(data),
+                success: function(){
+                    showToast(id ? "Task updated successfully" : "Task created successfully");
+                    resetFormToDefault();
+                    loadTasks(currentPage);
+                },
+                error: function(xhr){
+                    console.error("Error:", xhr.responseText);
+                    showToast("Save failed: " + (xhr.responseText || "Unknown error"), "error");
+                }
+            });
+        });
+
+        $("#resetBtn").click(function(){
+            resetFormToDefault();
+        });
+
+        // Start the application
+        $.when(loadUsersAndSupervisors()).then(() => {
+            console.log("Users and supervisors loaded, now loading tasks...");
+            loadTasks(1);
+            resetFormToDefault();
+        });
+    });
+</script>
+</body>
+</html>

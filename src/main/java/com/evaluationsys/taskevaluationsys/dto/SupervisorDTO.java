@@ -2,31 +2,25 @@ package com.evaluationsys.taskevaluationsys.dto;
 
 public class SupervisorDTO {
 
-    private Long departmentId;
-    private Long userId;
-    private Long branchId;
+    private String branchCode;
+    private String departmentCode;
+    private String supervisorCode; // main identifier only
 
-    public Long getDepartmentId() {
-        return departmentId;
-    }
+    // Add this field to identify the staff/user by internal ID
+    private Long staffId;
 
-    public void setDepartmentId(Long departmentId) {
-        this.departmentId = departmentId;
-    }
+    // =====================
+    // Getters and Setters
+    // =====================
+    public String getBranchCode() { return branchCode; }
+    public void setBranchCode(String branchCode) { this.branchCode = branchCode; }
 
-    public Long getUserId() {
-        return userId;
-    }
+    public String getDepartmentCode() { return departmentCode; }
+    public void setDepartmentCode(String departmentCode) { this.departmentCode = departmentCode; }
 
-    public void setUserId(Long userId) {
-        this.userId = userId;
-    }
+    public String getSupervisorCode() { return supervisorCode; }
+    public void setSupervisorCode(String supervisorCode) { this.supervisorCode = supervisorCode; }
 
-    public Long getBranchId() {
-        return branchId;
-    }
-
-    public void setBranchId(Long branchId) {
-        this.branchId = branchId;
-    }
+    public Long getStaffId() { return staffId; }
+    public void setStaffId(Long staffId) { this.staffId = staffId; }
 }

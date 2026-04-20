@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>User Management</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <!-- Select2 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+
+    <link rel="stylesheet" th:href="@{/css/styles.css}">
+    <link rel="stylesheet" th:href="@{/css/quries.css}">
+
+    <!-- Axios -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <!-- jQuery -->
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+    <!-- Select2 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+    <style>
+        /* Vertical buttons for actions */
+        .action-buttons button {
+            display: block;
+            width: 40px;
+            margin: 5px auto;
+            padding: 5px;
+        }
+        .action-buttons i {
+            font-size: 1.2rem;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container py-5">
+
+    <!-- Title + Dashboard Home -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="text-center fw-bold gradient-title flex-grow-1 mb-0">
+            👥 User Management
+        </h2>
+        <a href="/admin/dashboard" class="btn btn-secondary ms-3">⬅ Back Home</a>
+    </div>
+
+    <!-- Search Card -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-light">Search User by Staff Code</div>
+        <div class="card-body">
+            <div class="input-group">
+                <input type="number" id="searchStaffCode" class="form-control" placeholder="Enter Staff Code">
+            </div>
+        </div>
+    </div>
+
+    <!-- Users Table -->
+    <div class="card">
+        <div class="card-header bg-primary text-light">All Users</div>
+        <div class="card-body position-relative">
+            <!-- Loader -->
+            <div id="loader" class="text-center py-3" style="display:none;">
+                <div class="spinner-border text-primary" role="status"></div>
+            </div>
+
+            <table class="table table-striped" id="usersTable">
+                <thead>
+                <tr>
+                    <th>Staff Code</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Role</th>
+                    <th>Rank</th>
+                    <th>Department</th>
+                    <th>Branch</th>
+                    <th class="text-center">Action</th>
+                </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+
+            <!-- Pagination Controls -->
+            <nav aria-label="User pagination" class="mt-3">
+                <ul class="pagination justify-content-center" id="pagination"></ul>
+            </nav>
+        </div>
+    </div>
+
+</div>
+
+<!-- View Modal -->
+<div class="modal fade" id="userViewModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-light">
+                <h5 class="modal-title">User Details</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="userModalBody"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal fade" id="editUserModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-light">
+                <h5 class="modal-title">Edit User</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editUserForm">
+                    <input type="hidden" id="editStaffCode">
+
+                    <div class="mb-3">
+                        <label class="form-label">First Name</label>
+                        <input type="text" class="form-control" id="editFirstName" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Other Name</label>
+                        <input type="text" class="form-control" id="editOtherName">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-control" id="editEmail" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Phone</label>
+                        <input type="text" class="form-control" id="editPhone">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Role</label>
+                        <select class="form-select select2" id="editRole"></select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Rank</label>
+                        <input type="text" class="form-control" id="editRank">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Department</label>
+                        <select class="form-select select2" id="editDepartment"></select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Branch</label>
+                        <select class="form-select select2" id="editBranch"></select>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100">Save Changes</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Modal -->
+<div class="modal fade" id="deleteUserModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-light">
+                <h5 class="modal-title">Confirm Delete</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                Are you sure you want to delete user <strong id="deleteStaffCode"></strong>?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast -->
+<div class="position-fixed bottom-0 end-0 p-3">
+    <div id="liveToast" class="toast align-items-center text-white bg-success border-0">
+        <div class="d-flex">
+            <div class="toast-body" id="toastMsg"></div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    const baseUrl = '/users';
+    let deleteStaffCode = null;
+    let usersData = [];
+    let currentPage = 1;
+    const rowsPerPage = 100;
+
+    // Display users with pagination
+    function displayUsersPage(page = 1) {
+        currentPage = page;
+        const tbody = $('#usersTable tbody').empty();
+        const start = (page - 1) * rowsPerPage;
+        const end = start + rowsPerPage;
+        const pageUsers = usersData.slice(start, end);
+
+        if(pageUsers.length === 0){
+            tbody.append('<tr><td colspan="9" class="text-center">No user found</td></tr>');
+        }
+
+        pageUsers.forEach(user => {
+            const tr = `
+            <tr>
+                <td>${user.staffCode}</td>
+                <td>${user.firstName} ${user.otherName || ''}</td>
+                <td>${user.email}</td>
+                <td>${user.phoneNumber || ''}</td>
+                <td>${user.role || ''}</td>
+                <td>${user.rank || ''}</td>
+                <td>${user.departmentName || ''}</td>
+                <td>${user.branchName || ''}</td>
+                <td class="text-center action-buttons">
+                    <button class="btn btn-sm btn-info" title="View" onclick='viewUserObj(${JSON.stringify(user)})'>
+                        <i class="bi bi-eye-fill"></i>
+                    </button>
+                    <button class="btn btn-sm btn-primary" title="Edit" onclick="editUser(${user.staffCode})">
+                        <i class="bi bi-pencil-fill"></i>
+                    </button>
+                    <button class="btn btn-sm btn-danger" title="Delete" onclick="showDeleteModal(${user.staffCode})">
+                        <i class="bi bi-trash-fill"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+            tbody.append(tr);
+        });
+
+        renderPagination();
+    }
+
+    // Render pagination
+    function renderPagination() {
+        const totalPages = Math.ceil(usersData.length / rowsPerPage);
+        const pagination = $('#pagination').empty();
+
+        if(totalPages <= 1){
+            $('#pagination').hide();
+            return;
+        }
+        $('#pagination').show();
+
+        for(let i = 1; i <= totalPages; i++){
+            const li = $(`<li class="page-item ${i === currentPage ? 'active' : ''}"><a class="page-link" href="#">${i}</a></li>`);
+            li.on('click', function(e){
+                e.preventDefault();
+                displayUsersPage(i);
+            });
+            pagination.append(li);
+        }
+    }
+
+    // Load all users
+    async function loadUsers() {
+        $('#loader').show();
+        try {
+            const res = await axios.get(`${baseUrl}/fetchAllUsers`);
+            usersData = res.data;
+            displayUsersPage(1);
+        } catch (err) {
+            console.error('Failed to load users', err);
+            usersData = [];
+            displayUsersPage(1);
+        } finally {
+            $('#loader').hide();
+        }
+    }
+
+    // View user modal
+    function viewUserObj(user) {
+        const modalBody = document.getElementById('userModalBody');
+        modalBody.innerHTML = `
+        <p><strong>Staff Code:</strong> ${user.staffCode}</p>
+        <p><strong>Name:</strong> ${user.firstName} ${user.otherName || ''}</p>
+        <p><strong>Email:</strong> ${user.email}</p>
+        <p><strong>Phone:</strong> ${user.phoneNumber || ''}</p>
+        <p><strong>Role:</strong> ${user.role || ''}</p>
+        <p><strong>Rank:</strong> ${user.rank || ''}</p>
+        <p><strong>Department:</strong> ${user.departmentName || ''}</p>
+        <p><strong>Branch:</strong> ${user.branchName || ''}</p>
+    `;
+        new bootstrap.Modal(document.getElementById('userViewModal')).show();
+    }
+
+    // Edit user modal
+    async function editUser(staffCode) {
+        try {
+            const res = await axios.get(`${baseUrl}/fetchUser/${staffCode}`);
+            const u = res.data;
+
+            $('#editStaffCode').val(u.staffCode);
+            $('#editFirstName').val(u.firstName || '');
+            $('#editOtherName').val(u.otherName || '');
+            $('#editEmail').val(u.email || '');
+            $('#editPhone').val(u.phoneNumber || '');
+            $('#editRank').val(u.rank || '');
+
+            const [rolesRes, deptRes, branchRes] = await Promise.all([
+                axios.get(`${baseUrl}/roles`),
+                axios.get(`${baseUrl}/departments`),
+                axios.get(`${baseUrl}/branches`)
+            ]);
+
+            const modalEl = $('#editUserModal');
+
+            const roleSelect = $('#editRole', modalEl).empty();
+            rolesRes.data.forEach(r => roleSelect.append(new Option(r, r, r===u.role, r===u.role)));
+
+            const deptSelect = $('#editDepartment', modalEl).empty();
+            deptRes.data.forEach(d => deptSelect.append(new Option(d.name, d.id, d.id===u.departmentId, d.id===u.departmentId)));
+
+            const branchSelect = $('#editBranch', modalEl).empty();
+            branchRes.data.forEach(b => branchSelect.append(new Option(b.name, b.id, b.id===u.branchId, b.id===u.branchId)));
+
+            $('.select2', modalEl).select2({ dropdownParent: modalEl, width: '100%' });
+            roleSelect.val(u.role).trigger('change');
+            deptSelect.val(u.departmentId).trigger('change');
+            branchSelect.val(u.branchId).trigger('change');
+
+            new bootstrap.Modal(document.getElementById('editUserModal')).show();
+        } catch(err) {
+            console.error(err);
+            alert('Failed to load user for editing.');
+        }
+    }
+
+    // Submit edit form
+    $('#editUserForm').on('submit', function(e){
+        e.preventDefault();
+        const staffCode = $('#editStaffCode').val();
+        const data = {
+            firstName: $('#editFirstName').val(),
+            otherName: $('#editOtherName').val(),
+            email: $('#editEmail').val(),
+            phoneNumber: $('#editPhone').val(),
+            role: $('#editRole').val(),
+            rank: $('#editRank').val(),
+            departmentId: $('#editDepartment').val(),
+            branchId: $('#editBranch').val()
+        };
+        axios.put(`${baseUrl}/updateUser/${staffCode}`, data)
+            .then(() => {
+                showToast('User updated successfully');
+                loadUsers();
+                bootstrap.Modal.getInstance(document.getElementById('editUserModal')).hide();
+            })
+            .catch(err => alert('Update failed: ' + (err.response?.data?.message || err)));
+    });
+
+    // Delete user modal
+    function showDeleteModal(staffCode) {
+        deleteStaffCode = staffCode;
+        $('#deleteStaffCode').text(staffCode);
+        new bootstrap.Modal(document.getElementById('deleteUserModal')).show();
+    }
+
+    $('#confirmDeleteBtn').on('click', function(){
+        if(deleteStaffCode){
+            axios.delete(`${baseUrl}/deleteUser/${deleteStaffCode}`)
+                .then(() => {
+                    showToast('User deleted');
+                    loadUsers();
+                    bootstrap.Modal.getInstance(document.getElementById('deleteUserModal')).hide();
+                    deleteStaffCode = null;
+                })
+                .catch(() => alert('Delete failed'));
+        }
+    });
+
+    // Live search
+    let searchTimeout = null;
+    $('#searchStaffCode').on('input', function() {
+        const staffCode = $(this).val().trim();
+        clearTimeout(searchTimeout);
+
+        if(!staffCode) {
+            loadUsers();
+            return;
+        }
+
+        searchTimeout = setTimeout(() => {
+            axios.get(`${baseUrl}/fetchUser/${staffCode}`)
+                .then(res => {
+                    const u = res.data;
+                    usersData = u ? [u] : [];
+                    displayUsersPage(1);
+                })
+                .catch(() => {
+                    usersData = [];
+                    displayUsersPage(1);
+                });
+        }, 300);
+    });
+
+    // Toast helper
+    function showToast(msg){
+        $('#toastMsg').text(msg);
+        new bootstrap.Toast(document.getElementById('liveToast')).show();
+    }
+
+    // Reset modals after close
+    $('#editUserModal').on('hidden.bs.modal', function () {
+        $('#editUserForm')[0].reset();
+        $('.select2', this).val(null).trigger('change');
+    });
+    $('#deleteUserModal').on('hidden.bs.modal', function () {
+        deleteStaffCode = null;
+    });
+
+    // Initial load
+    loadUsers();
+</script>
+
+</body>
+</html>

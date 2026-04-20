@@ -1,6 +1,6 @@
 package com.evaluationsys.taskevaluationsys.dto;
 
-import com.evaluationsys.taskevaluationsys.entity.Role;
+import com.evaluationsys.taskevaluationsys.entity.enums.Role;
 
 public class UserDTO {
 

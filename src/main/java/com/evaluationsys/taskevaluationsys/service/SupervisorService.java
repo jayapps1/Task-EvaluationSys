@@ -2,34 +2,37 @@ package com.evaluationsys.taskevaluationsys.service;
 
 import com.evaluationsys.taskevaluationsys.dto.SupervisorDTO;
 import com.evaluationsys.taskevaluationsys.dtoresponse.SupervisorDTOResponse;
-import com.evaluationsys.taskevaluationsys.entity.Department;
-import com.evaluationsys.taskevaluationsys.entity.Supervisor;
-import com.evaluationsys.taskevaluationsys.entity.User;
+import com.evaluationsys.taskevaluationsys.entity.*;
+import com.evaluationsys.taskevaluationsys.repository.BranchRepository;
 import com.evaluationsys.taskevaluationsys.repository.DepartmentRepository;
 import com.evaluationsys.taskevaluationsys.repository.SupervisorRepository;
 import com.evaluationsys.taskevaluationsys.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 @Service
 public class SupervisorService {
 
     private final SupervisorRepository supervisorRepository;
     private final DepartmentRepository departmentRepository;
+    private final BranchRepository branchRepository;
     private final UserRepository userRepository;
 
     public SupervisorService(SupervisorRepository supervisorRepository,
                              DepartmentRepository departmentRepository,
+                             BranchRepository branchRepository,
                              UserRepository userRepository) {
         this.supervisorRepository = supervisorRepository;
         this.departmentRepository = departmentRepository;
+        this.branchRepository = branchRepository;
         this.userRepository = userRepository;
     }
 
-    // GET ALL SUPERVISORS
+    // =========================
+    // GET ALL
+    // =========================
     public List<SupervisorDTOResponse> getAllSupervisors() {
         return supervisorRepository.findAll()
                 .stream()
@@ -37,87 +40,124 @@ public class SupervisorService {
                 .toList();
     }
 
-    // GET SUPERVISOR BY CODE
     public Optional<SupervisorDTOResponse> getSupervisorByCode(String supervisorCode) {
         return supervisorRepository.findBySupervisorCode(supervisorCode)
                 .map(this::mapToResponse);
     }
 
-    private String generateSupervisorCode(Supervisor supervisor) {
-        String branchName = supervisor.getDepartment().getBranch().getBranchName();
-        String deptName = supervisor.getDepartment().getDepartmentName();
-
-        String branchCode = branchName.length() >= 3 ? branchName.substring(0,3).toUpperCase() : branchName.toUpperCase();
-        String deptCode = deptName.length() >= 3 ? deptName.substring(0,3).toUpperCase() : deptName.toUpperCase();
-
-        // Get last supervisor for sequence
-        String prefix = branchCode + "/" + deptCode + "/SUP/";
-        Optional<Supervisor> lastSupervisor =
-                supervisorRepository.findTopBySupervisorCodeStartingWithOrderBySupervisorCodeDesc(prefix);
-
-        int nextNumber = 1;
-        if (lastSupervisor.isPresent()) {
-            String lastCode = lastSupervisor.get().getSupervisorCode();
-            String[] parts = lastCode.split("/");
-            nextNumber = Integer.parseInt(parts[3]) + 1; // last ### + 1
-        }
-
-        return String.format("%s%03d", prefix, nextNumber);
-    }
-
-    // CREATE SUPERVISOR
+    // =========================
+    // CREATE
+    // =========================
     @Transactional
-    public SupervisorDTOResponse createSupervisor(SupervisorDTO dto) {
+    public SupervisorDTOResponse createSupervisorByCodes(SupervisorDTO dto) {
 
-        Department department = departmentRepository.findById(dto.getDepartmentId())
+        Branch branch = branchRepository.findByBranchCode(dto.getBranchCode())
+                .orElseThrow(() -> new RuntimeException("Branch not found"));
+
+        Department department = departmentRepository.findByDepartmentCode(dto.getDepartmentCode())
                 .orElseThrow(() -> new RuntimeException("Department not found"));
 
-        User user = userRepository.findById(dto.getUserId())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        User staff = userRepository.findById(dto.getStaffId())
+                .orElseThrow(() -> new RuntimeException("Staff not found"));
+
+        if (!department.getBranch().getBranchCode().equals(branch.getBranchCode())) {
+            throw new RuntimeException("Department does not belong to branch");
+        }
+
+        supervisorRepository.findByUserAndBranchAndDepartment(staff, branch, department)
+                .ifPresent(s -> {
+                    throw new RuntimeException("Supervisor already exists");
+                });
 
         Supervisor supervisor = new Supervisor();
+        supervisor.setBranch(branch);
         supervisor.setDepartment(department);
-        supervisor.setUser(user);
+        supervisor.setUser(staff);
+        supervisor.setSupervisorCode(generateSupervisorCode(branch, department));
 
-        String supervisorCode = generateSupervisorCode(supervisor);
-        supervisor.setSupervisorCode(supervisorCode);
-
-        Supervisor savedSupervisor = supervisorRepository.save(supervisor);
-
-        return mapToResponse(savedSupervisor);
+        return mapToResponse(supervisorRepository.save(supervisor));
     }
 
-    // UPDATE SUPERVISOR
+    // =========================
+    // UPDATE
+    // =========================
     @Transactional
-    public Optional<SupervisorDTOResponse> updateSupervisor(String supervisorCode, SupervisorDTO dto) {
+    public Optional<SupervisorDTOResponse> updateSupervisorByCodes(String supervisorCode, SupervisorDTO dto) {
 
         return supervisorRepository.findBySupervisorCode(supervisorCode)
                 .map(supervisor -> {
 
-                    Department department = departmentRepository.findById(dto.getDepartmentId())
+                    Branch branch = branchRepository.findByBranchCode(dto.getBranchCode())
+                            .orElseThrow(() -> new RuntimeException("Branch not found"));
+
+                    Department department = departmentRepository.findByDepartmentCode(dto.getDepartmentCode())
                             .orElseThrow(() -> new RuntimeException("Department not found"));
 
-                    User user = userRepository.findById(dto.getUserId())
-                            .orElseThrow(() -> new RuntimeException("User not found"));
+                    User staff = userRepository.findById(dto.getStaffId())
+                            .orElseThrow(() -> new RuntimeException("Staff not found"));
 
+                    if (!department.getBranch().getBranchCode().equals(branch.getBranchCode())) {
+                        throw new RuntimeException("Department mismatch");
+                    }
+
+                    supervisorRepository.findByUserAndBranchAndDepartment(staff, branch, department)
+                            .ifPresent(existing -> {
+                                if (!existing.getSupervisorId().equals(supervisor.getSupervisorId())) {
+                                    throw new RuntimeException("Duplicate supervisor exists");
+                                }
+                            });
+
+                    supervisor.setBranch(branch);
                     supervisor.setDepartment(department);
-                    supervisor.setUser(user);
+                    supervisor.setUser(staff);
 
-                    Supervisor updatedSupervisor = supervisorRepository.save(supervisor);
-
-                    return mapToResponse(updatedSupervisor);
+                    return mapToResponse(supervisorRepository.save(supervisor));
                 });
     }
 
-    // DELETE SUPERVISOR
+    // =========================
+    // DELETE
+    // =========================
     @Transactional
-    public void deleteSupervisor(String supervisorCode) {
+    public void deleteSupervisorByCode(String supervisorCode) {
+        Supervisor supervisor = supervisorRepository.findBySupervisorCode(supervisorCode)
+                .orElseThrow(() -> new RuntimeException("Supervisor not found"));
 
-        supervisorRepository.findBySupervisorCode(supervisorCode)
-                .ifPresent(supervisorRepository::delete);
+        supervisorRepository.delete(supervisor);
     }
 
-    // ENTITY → RESPONSE DTO
+    // =========================
+    // CODE GENERATION
+    // =========================
+    private String generateSupervisorCode(Branch branch, Department department) {
+
+        String branchCode = branch.getBranchName().length() >= 3
+                ? branch.getBranchName().substring(0, 3).toUpperCase()
+                : branch.getBranchName().toUpperCase();
+
+        String deptCode = department.getDepartmentName().length() >= 3
+                ? department.getDepartmentName().substring(0, 3).toUpperCase()
+                : department.getDepartmentName().toUpperCase();
+
+        String prefix = branchCode + "/" + deptCode + "/SUP/";
+
+        Optional<Supervisor> last = supervisorRepository
+                .findTopBySupervisorCodeStartingWithOrderBySupervisorCodeDesc(prefix);
+
+        int next = last.map(s -> {
+            try {
+                return Integer.parseInt(s.getSupervisorCode().split("/")[3]) + 1;
+            } catch (Exception e) {
+                return 1;
+            }
+        }).orElse(1);
+
+        return String.format("%s%03d", prefix, next);
+    }
+
+    // =========================
+    // MAPPER
+    // =========================
     private SupervisorDTOResponse mapToResponse(Supervisor supervisor) {
 
         SupervisorDTOResponse dto = new SupervisorDTOResponse();
@@ -125,20 +165,72 @@ public class SupervisorService {
         dto.setSupervisorId(supervisor.getSupervisorId());
         dto.setSupervisorCode(supervisor.getSupervisorCode());
 
-        dto.setDepartmentId(supervisor.getDepartment().getDepartmentId());
-        dto.setDepartmentName(supervisor.getDepartment().getDepartmentName());
+        Branch branch = supervisor.getBranch();
+        Department dept = supervisor.getDepartment();
+        User user = supervisor.getUser();
 
-        dto.setBranchId(supervisor.getDepartment().getBranch().getBranchId());
-        dto.setBranchName(supervisor.getDepartment().getBranch().getBranchName());
+        dto.setBranchId(branch != null ? branch.getBranchId() : null);
+        dto.setBranchCode(branch != null ? branch.getBranchCode() : null);
+        dto.setBranchName(branch != null ? branch.getBranchName() : null);
 
-        dto.setStaffId(supervisor.getUser().getStaffId());
-        dto.setStaffCode(supervisor.getUser().getStaffCode());
-        dto.setFirstName(supervisor.getUser().getFirstName());
-        dto.setOtherName(supervisor.getUser().getOtherName());
+        dto.setDepartmentId(dept != null ? dept.getDepartmentId() : null);
+        dto.setDepartmentCode(dept != null ? dept.getDepartmentCode() : null);
+        dto.setDepartmentName(dept != null ? dept.getDepartmentName() : null);
+
+        dto.setStaffId(user != null ? user.getStaffId() : null);
+        dto.setStaffCode(user != null ? user.getStaffCode() : null);
+        dto.setFirstName(user != null ? user.getFirstName() : null);
+        dto.setOtherName(user != null ? user.getOtherName() : null);
+
+        // 🔥 OPTIONAL: if you added these in DTO
+        dto.setSupervisorPhone(user != null ? user.getPhoneNumber() : null);
 
         dto.setCreatedAt(supervisor.getCreatedAt());
         dto.setUpdatedAt(supervisor.getUpdatedAt());
 
         return dto;
+    }
+
+    // =========================
+    // FIXED SUPERVISOR LOOKUP (NO INVALID SPRING METHOD)
+    // =========================
+    public Optional<Supervisor> findDepartmentSupervisor(User staff) {
+
+        if (staff == null || staff.getDepartment() == null) {
+            return Optional.empty();
+        }
+
+        // ✅ FIX: use valid repository method
+        return supervisorRepository.findByUserStaffCode(staff.getStaffCode());
+    }
+
+    // =========================
+    // CONTACT FOR UI
+    // =========================
+    public Map<String, String> getSupervisorContact(User staff) {
+
+        Map<String, String> result = new HashMap<>();
+
+        Supervisor supervisor = findDepartmentSupervisor(staff).orElse(null);
+
+        if (supervisor != null && supervisor.getUser() != null) {
+
+            User u = supervisor.getUser();
+
+            result.put("name",
+                    (u.getFirstName() != null ? u.getFirstName() : "") + " " +
+                            (u.getOtherName() != null ? u.getOtherName() : "")
+            );
+
+            result.put("phone",
+                    u.getPhoneNumber() != null ? u.getPhoneNumber() : "N/A"
+            );
+
+        } else {
+            result.put("name", "N/A");
+            result.put("phone", "N/A");
+        }
+
+        return result;
     }
 }

@@ -1,6 +1,8 @@
 package com.evaluationsys.taskevaluationsys.service;
 
+import com.evaluationsys.taskevaluationsys.entity.Branch;
 import com.evaluationsys.taskevaluationsys.entity.Department;
+import com.evaluationsys.taskevaluationsys.repository.BranchRepository;
 import com.evaluationsys.taskevaluationsys.repository.DepartmentRepository;
 import org.springframework.stereotype.Service;
 
@@ -11,51 +13,56 @@ import java.util.Optional;
 public class DepartmentService {
 
     private final DepartmentRepository departmentRepository;
+    private final BranchRepository branchRepository;
 
-    public DepartmentService(DepartmentRepository departmentRepository) {
+    public DepartmentService(DepartmentRepository departmentRepository,
+                             BranchRepository branchRepository) {
         this.departmentRepository = departmentRepository;
+        this.branchRepository = branchRepository;
     }
 
     // =========================
-    // GET ALL DEPARTMENTS
+    // GET ALL
     // =========================
     public List<Department> getAllDepartments() {
         return departmentRepository.findAll();
     }
 
     // =========================
-    // GET DEPARTMENT BY CODE
+    // GET BY CODE
     // =========================
     public Optional<Department> getDepartmentByCode(String departmentCode) {
-
         return departmentRepository.findByDepartmentCode(departmentCode);
-
     }
 
     // =========================
-    // CREATE DEPARTMENT
+    // CREATE
     // =========================
     public Department createDepartment(Department department) {
 
-        // convert name to uppercase
         String name = department.getDepartmentName().toUpperCase();
-
-        // create prefix (first 3 letters)
         String prefix = name.substring(0, Math.min(3, name.length()));
-
-        // count departments to generate number
         long count = departmentRepository.count();
 
-        // create code
         String code = prefix + String.format("%03d", count + 1);
-
         department.setDepartmentCode(code);
+
+
+        if (department.getBranch() != null &&
+                department.getBranch().getBranchCode() != null) {
+
+            Branch branch = branchRepository
+                    .findByBranchCode(department.getBranch().getBranchCode())
+                    .orElseThrow(() -> new RuntimeException("Branch not found"));
+
+            department.setBranch(branch);
+        }
 
         return departmentRepository.save(department);
     }
 
     // =========================
-    // UPDATE DEPARTMENT BY CODE
+    // UPDATE
     // =========================
     public Optional<Department> updateDepartment(String departmentCode, Department departmentDetails) {
 
@@ -63,21 +70,28 @@ public class DepartmentService {
                 .map(department -> {
 
                     department.setDepartmentName(departmentDetails.getDepartmentName());
-                    department.setBranch(departmentDetails.getBranch());
+
+                    //  attach REAL branch
+                    if (departmentDetails.getBranch() != null &&
+                            departmentDetails.getBranch().getBranchCode() != null) {
+
+                        Branch branch = branchRepository
+                                .findByBranchCode(departmentDetails.getBranch().getBranchCode())
+                                .orElseThrow(() -> new RuntimeException("Branch not found"));
+
+                        department.setBranch(branch);
+                    }
 
                     return departmentRepository.save(department);
-
                 });
     }
 
     // =========================
-    // DELETE DEPARTMENT BY CODE
+    // DELETE
     // =========================
     public void deleteDepartment(String departmentCode) {
 
         departmentRepository.findByDepartmentCode(departmentCode)
                 .ifPresent(departmentRepository::delete);
-
     }
-
 }

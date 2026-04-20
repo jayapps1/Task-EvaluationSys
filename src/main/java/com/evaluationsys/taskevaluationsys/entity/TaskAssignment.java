@@ -1,5 +1,6 @@
 package com.evaluationsys.taskevaluationsys.entity;
 
+import com.evaluationsys.taskevaluationsys.entity.enums.TaskStatus;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
@@ -29,12 +30,15 @@ public class TaskAssignment {
     private String taskAssignCode;
 
     private LocalDateTime assignedAt;
-    private String status;
+
+    @Enumerated(EnumType.STRING)  // This stores the enum name as string in DB
+    @Column(name = "status")
+    private TaskStatus status;  // Changed from String to TaskStatus enum
 
     public TaskAssignment() {}
 
     public TaskAssignment(TaskAssignmentId id, Task task, User assignUser,
-                          String taskAssignCode, LocalDateTime assignedAt, String status) {
+                          String taskAssignCode, LocalDateTime assignedAt, TaskStatus status) {
         this.id = id;
         this.task = task;
         this.assignUser = assignUser;
@@ -59,8 +63,8 @@ public class TaskAssignment {
     public LocalDateTime getAssignedAt() { return assignedAt; }
     public void setAssignedAt(LocalDateTime assignedAt) { this.assignedAt = assignedAt; }
 
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
+    public TaskStatus getStatus() { return status; }
+    public void setStatus(TaskStatus status) { this.status = status; }
 
     @Override
     public String toString() {
@@ -70,7 +74,7 @@ public class TaskAssignment {
                 ", task=" + task +
                 ", assignUser=" + assignUser +
                 ", assignedAt=" + assignedAt +
-                ", status='" + status + '\'' +
+                ", status=" + status +
                 '}';
     }
 }

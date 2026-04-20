@@ -1,0 +1,68 @@
+<nav class="navbar navbar-expand-lg navbar-custom" th:fragment="navbar">
+    <div class="container">
+
+        <!-- Brand -->
+        <a class="navbar-brand" href="#">
+            <i class="fa-solid fa-rocket me-2"></i> TES
+        </a>
+
+        <!-- Mobile toggler -->
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+                data-bs-target="#navbarSupportedContent">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <!-- Navbar content -->
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+
+            <!-- LEFT MENU -->
+            <ul class="navbar-nav mb-2 mb-lg-0">
+                <li class="nav-item">
+                    <a class="nav-link active" th:href="@{/supervisor/dashboard}">Home</a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link" th:href="@{/about}">About Us</a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link" th:href="@{/contact}">Contact Us</a>
+                </li>
+            </ul>
+
+            <!-- CENTER SEARCH -->
+            <form class="d-flex mx-auto" style="max-width: 400px;">
+                <input class="form-control me-2" type="search" placeholder="Search">
+                <button class="btn btn-outline-success" type="submit">Search</button>
+            </form>
+
+            <!-- RIGHT MENU -->
+            <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
+
+                <!-- Logged in -->
+                <li class="nav-item dropdown" th:if="${#authorization.expression('isAuthenticated()')}">
+                    <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
+                        My Account
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" th:href="@{/profile}">Profile</a></li>
+                        <li><a class="dropdown-item" th:href="@{/profile/change-password}">Change Password</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <form th:action="@{/logout}" method="post">
+                                <button type="submit" class="dropdown-item">Log Out</button>
+                            </form>
+                        </li>
+                    </ul>
+                </li>
+
+                <!-- Not logged in -->
+                <li class="nav-item" th:if="${!#authorization.expression('isAuthenticated()')}">
+                    <a class="nav-link" th:href="@{/auth/login}">Log In</a>
+                </li>
+
+            </ul>
+
+        </div>
+    </div>
+</nav>
