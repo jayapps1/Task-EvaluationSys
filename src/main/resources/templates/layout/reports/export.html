@@ -1,0 +1,469 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Export Data - TES</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" th:href="@{/css/styles.css}">
+  <link rel="stylesheet" th:href="@{/css/quries.css}">
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+
+  <style>
+    :root {
+        --deep-navy: #161E54;
+        --light-blue: #BBE0EF;
+        --white: #FFFFFF;
+        --success-green: #2ECC71;
+        --vibrant-orange: #F16D34;
+        --warning-yellow: #F1C40F;
+        --info-blue: #3498db;
+    }
+
+    body {
+        background-color: var(--light-blue);
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        min-height: 100vh;
+    }
+
+    .container-custom {
+        padding: 20px;
+        margin-top: 70px;
+    }
+
+    .page-header {
+        background: var(--white);
+        border-radius: 15px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    .btn-back {
+        background-color: var(--deep-navy);
+        border: none;
+        color: white;
+        border-radius: 20px;
+        padding: 8px 20px;
+    }
+
+    .btn-back:hover {
+        background-color: #0f1442;
+        color: white;
+    }
+
+    .export-card {
+        background: var(--white);
+        border-radius: 15px;
+        padding: 30px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        text-align: center;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        cursor: pointer;
+        border: 2px solid transparent;
+    }
+
+    .export-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 15px rgba(0,0,0,0.15);
+    }
+
+    .export-card.selected {
+        border-color: var(--deep-navy);
+    }
+
+    .export-icon {
+        font-size: 48px;
+        margin-bottom: 15px;
+    }
+
+    .export-card.staff .export-icon { color: var(--deep-navy); }
+    .export-card.tasks .export-icon { color: var(--success-green); }
+    .export-card.branches .export-icon { color: var(--vibrant-orange); }
+    .export-card.departments .export-icon { color: var(--info-blue); }
+    .export-card.supervisors .export-icon { color: #9B59B6; }
+    .export-card.performance .export-icon { color: var(--warning-yellow); }
+    .export-card.all .export-icon { color: #e74c3c; }
+
+    .filter-section {
+        background: var(--white);
+        border-radius: 15px;
+        padding: 25px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    .section-title {
+        color: var(--deep-navy);
+        font-weight: bold;
+        margin-bottom: 20px;
+        border-left: 4px solid var(--vibrant-orange);
+        padding-left: 15px;
+    }
+
+    .format-selector {
+        display: flex;
+        gap: 15px;
+        justify-content: center;
+        margin-top: 20px;
+    }
+
+    .format-option {
+        padding: 15px 30px;
+        border: 2px solid #ddd;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .format-option:hover {
+        border-color: var(--deep-navy);
+        background-color: #f8f9fa;
+    }
+
+    .format-option.selected {
+        border-color: var(--deep-navy);
+        background-color: var(--deep-navy);
+        color: white;
+    }
+
+    .format-option.selected i {
+        color: white;
+    }
+
+    .btn-export {
+        background-color: var(--success-green);
+        border: none;
+        color: white;
+        border-radius: 25px;
+        padding: 12px 40px;
+        font-size: 18px;
+        font-weight: bold;
+        margin-top: 20px;
+    }
+
+    .btn-export:hover {
+        background-color: #27ae60;
+        color: white;
+    }
+
+    .preview-table {
+        max-height: 300px;
+        overflow-y: auto;
+        margin-top: 20px;
+    }
+
+    .date-range-box {
+        background: linear-gradient(135deg, var(--deep-navy), #2a3f8a);
+        color: white;
+        padding: 15px 20px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+    }
+
+    .toast-container {
+        position: fixed;
+        top: 80px;
+        right: 20px;
+        z-index: 9999;
+    }
+  </style>
+</head>
+
+<body>
+<div th:replace="~{layout/navbar :: navbar}"></div>
+
+<div class="container-custom">
+  <div class="container-fluid">
+
+    <!-- Header -->
+    <div class="page-header">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h2><i class="fas fa-download"></i> Export Data</h2>
+          <p class="text-muted mb-0">Export system data to CSV or Excel format</p>
+        </div>
+        <a th:href="@{/admin/dashboard}" class="btn btn-back">
+          <i class="fas fa-arrow-left"></i> Back to Dashboard
+        </a>
+      </div>
+    </div>
+
+    <!-- Date Range Filter -->
+    <div class="date-range-box">
+      <div class="row align-items-center">
+        <div class="col-md-5">
+          <label class="fw-bold mb-2"><i class="fas fa-calendar-alt"></i> Select Date Range (Optional)</label>
+          <div class="d-flex gap-2">
+            <input type="date" id="startDate" class="form-control">
+            <span class="text-white align-self-center">to</span>
+            <input type="date" id="endDate" class="form-control">
+          </div>
+        </div>
+        <div class="col-md-3">
+          <label class="fw-bold mb-2"><i class="fas fa-filter"></i> Quick Select</label>
+          <select id="quickPeriod" class="form-select">
+            <option value="">Custom Range</option>
+            <option value="thisMonth">This Month</option>
+            <option value="lastMonth">Last Month</option>
+            <option value="thisQuarter">This Quarter</option>
+            <option value="thisYear">This Year</option>
+            <option value="allTime">All Time</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="fw-bold mb-2"><i class="fas fa-info-circle"></i> Current Period</label>
+          <div class="bg-white text-dark p-2 rounded">
+            <i class="fas fa-calendar"></i> <span id="periodDisplay">All Time</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Export Format Selection -->
+    <div class="filter-section">
+      <h5 class="section-title"><i class="fas fa-file-export"></i> Select Export Format</h5>
+      <div class="format-selector">
+        <div class="format-option selected" data-format="csv">
+          <i class="fas fa-file-csv fa-2x mb-2" style="color: #2ECC71;"></i>
+          <h5>CSV</h5>
+          <p class="mb-0 small">Comma Separated Values</p>
+        </div>
+        <div class="format-option" data-format="excel">
+          <i class="fas fa-file-excel fa-2x mb-2" style="color: #27ae60;"></i>
+          <h5>Excel</h5>
+          <p class="mb-0 small">Microsoft Excel Format</p>
+        </div>
+        <div class="format-option" data-format="json">
+          <i class="fas fa-file-code fa-2x mb-2" style="color: #f39c12;"></i>
+          <h5>JSON</h5>
+          <p class="mb-0 small">JavaScript Object Notation</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Data Type Selection -->
+    <div class="row">
+      <div class="col-md-4">
+        <div class="export-card staff" data-type="staff">
+          <div class="export-icon">
+            <i class="fas fa-users"></i>
+          </div>
+          <h5>Staff Data</h5>
+          <p class="text-muted">Export all staff information including departments and branches</p>
+          <span class="badge bg-primary">Records: <span th:text="${totalStaff != null ? totalStaff : 0}">0</span></span>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="export-card tasks" data-type="tasks">
+          <div class="export-icon">
+            <i class="fas fa-tasks"></i>
+          </div>
+          <h5>Task Data</h5>
+          <p class="text-muted">Export all tasks with status and assignment details</p>
+          <span class="badge bg-success">Records: <span th:text="${totalTasks != null ? totalTasks : 0}">0</span></span>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="export-card branches" data-type="branches">
+          <div class="export-icon">
+            <i class="fas fa-code-branch"></i>
+          </div>
+          <h5>Branch Data</h5>
+          <p class="text-muted">Export all branch information</p>
+          <span class="badge bg-warning">Records: <span th:text="${totalBranches != null ? totalBranches : 0}">0</span></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-md-4">
+        <div class="export-card departments" data-type="departments">
+          <div class="export-icon">
+            <i class="fas fa-building"></i>
+          </div>
+          <h5>Department Data</h5>
+          <p class="text-muted">Export all department information</p>
+          <span class="badge bg-info">Records: <span th:text="${totalDepartments != null ? totalDepartments : 0}">0</span></span>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="export-card supervisors" data-type="supervisors">
+          <div class="export-icon">
+            <i class="fas fa-user-tie"></i>
+          </div>
+          <h5>Supervisor Data</h5>
+          <p class="text-muted">Export all supervisor assignments</p>
+          <span class="badge bg-secondary">Records: <span th:text="${totalSupervisors != null ? totalSupervisors : 0}">0</span></span>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="export-card performance" data-type="performance">
+          <div class="export-icon">
+            <i class="fas fa-chart-bar"></i>
+          </div>
+          <h5>Performance Report</h5>
+          <p class="text-muted">Export staff performance metrics</p>
+          <span class="badge bg-danger">Summary</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-12">
+        <div class="export-card all" data-type="all">
+          <div class="export-icon">
+            <i class="fas fa-database"></i>
+          </div>
+          <h5>Export All Data</h5>
+          <p class="text-muted">Export all system data in a single package (ZIP)</p>
+          <span class="badge bg-dark">Complete Export</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Export Button -->
+    <div class="text-center">
+      <button class="btn-export" id="exportBtn">
+        <i class="fas fa-download me-2"></i> Export Selected Data
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container"></div>
+
+<script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+  $(document).ready(function() {
+      let selectedType = null;
+      let selectedFormat = 'csv';
+
+      // Initialize Select2
+      $('#quickPeriod').select2({
+          placeholder: 'Select period...',
+          allowClear: true,
+          width: '100%'
+      });
+
+      // Set default dates
+      const today = new Date();
+      const firstOfYear = new Date(today.getFullYear(), 0, 1);
+      $('#startDate').val(firstOfYear.toISOString().split('T')[0]);
+      $('#endDate').val(today.toISOString().split('T')[0]);
+
+      // Update period display
+      function updatePeriodDisplay() {
+          const start = $('#startDate').val();
+          const end = $('#endDate').val();
+          $('#periodDisplay').text(start && end ? `${start} to ${end}` : 'All Time');
+      }
+      $('#startDate, #endDate').on('change', updatePeriodDisplay);
+      updatePeriodDisplay();
+
+      // Quick period select
+      $('#quickPeriod').on('change', function() {
+          const period = $(this).val();
+          const now = new Date();
+          let startDate, endDate;
+
+          switch(period) {
+              case 'thisMonth':
+                  startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+                  endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                  break;
+              case 'lastMonth':
+                  startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                  endDate = new Date(now.getFullYear(), now.getMonth(), 0);
+                  break;
+              case 'thisQuarter':
+                  const quarter = Math.floor(now.getMonth() / 3);
+                  startDate = new Date(now.getFullYear(), quarter * 3, 1);
+                  endDate = new Date(now.getFullYear(), (quarter + 1) * 3, 0);
+                  break;
+              case 'thisYear':
+                  startDate = new Date(now.getFullYear(), 0, 1);
+                  endDate = new Date(now.getFullYear(), 11, 31);
+                  break;
+              case 'allTime':
+                  startDate = new Date(2020, 0, 1);
+                  endDate = today;
+                  break;
+              default:
+                  return;
+          }
+
+          $('#startDate').val(startDate.toISOString().split('T')[0]);
+          $('#endDate').val(endDate.toISOString().split('T')[0]);
+          updatePeriodDisplay();
+      });
+
+      // Select data type
+      $('.export-card').click(function() {
+          $('.export-card').removeClass('selected');
+          $(this).addClass('selected');
+          selectedType = $(this).data('type');
+      });
+
+      // Select format
+      $('.format-option').click(function() {
+          $('.format-option').removeClass('selected');
+          $(this).addClass('selected');
+          selectedFormat = $(this).data('format');
+      });
+
+      // Show toast notification
+      function showToast(message, type = 'success') {
+          const bgColor = type === 'success' ? '#161E54' : '#E76F51';
+          const toast = $(`
+              <div class="toast text-white mb-2" style="background:${bgColor}">
+                  <div class="d-flex">
+                      <div class="toast-body">${message}</div>
+                      <button class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                  </div>
+              </div>
+          `);
+          $('.toast-container').append(toast);
+          new bootstrap.Toast(toast[0], { delay: 3000 }).show();
+          toast.on('hidden.bs.toast', () => toast.remove());
+      }
+
+      // Export button
+      $('#exportBtn').click(function() {
+          if (!selectedType) {
+              showToast('Please select a data type to export', 'error');
+              return;
+          }
+
+          const startDate = $('#startDate').val();
+          const endDate = $('#endDate').val();
+
+          let url = `/reports/api/export/${selectedType}?format=${selectedFormat}`;
+          if (startDate) url += `&startDate=${startDate}`;
+          if (endDate) url += `&endDate=${endDate}`;
+
+          showToast(`Preparing ${selectedType} export in ${selectedFormat.toUpperCase()} format...`);
+
+          // Trigger download
+          window.location.href = url;
+
+          setTimeout(() => {
+              showToast('Export completed successfully!', 'success');
+          }, 2000);
+      });
+
+      // Select staff by default
+      $('.export-card[data-type="staff"]').addClass('selected');
+      selectedType = 'staff';
+  });
+</script>
+</body>
+</html>

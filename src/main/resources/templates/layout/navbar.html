@@ -2,7 +2,7 @@
   <div class="container">
 
     <!-- Brand -->
-    <a class="navbar-brand" href="#">
+    <a class="navbar-brand" th:href="@{/index}">
       <i class="fa-solid fa-rocket me-2"></i> TES
     </a>
 
@@ -18,51 +18,136 @@
       <!-- LEFT -->
       <ul class="navbar-nav mb-2 mb-lg-0">
         <li class="nav-item">
-          <a class="nav-link active" th:href="@{/index}">Home</a>
+          <a class="nav-link" th:href="@{/layout/admin/index}">Home</a>
         </li>
 
-        <!-- ✅ Dashboard Trigger -->
+        <!-- Dashboard Menu Trigger (All authenticated users) -->
         <li class="nav-item" th:if="${#authorization.expression('isAuthenticated()')}">
           <a class="nav-link" href="#" data-bs-toggle="offcanvas" data-bs-target="#dashboardMenu">
-            Dashboard
+            <i class="fas fa-th-large"></i> Menu
           </a>
         </li>
 
-        <!-- Reports -->
+        <!-- Admin Dashboard Link -->
+        <li class="nav-item" th:if="${#authorization.expression('hasRole(''ADMIN'')')}">
+          <a class="nav-link" th:href="@{/admin/dashboard}">
+            <i class="fas fa-tachometer-alt"></i> Dashboard
+          </a>
+        </li>
+
+        <!-- Supervisor Dashboard Link -->
+        <li class="nav-item" th:if="${#authorization.expression('hasRole(''SUPERVISOR'')')}">
+          <a class="nav-link" th:href="@{/supervisor/dashboard}">
+            <i class="fas fa-tachometer-alt"></i> Dashboard
+          </a>
+        </li>
+
+        <!-- Staff Dashboard Link -->
+        <li class="nav-item" th:if="${#authorization.expression('hasRole(''STAFF'')')}">
+          <a class="nav-link" th:href="@{/staff/dashboard}">
+            <i class="fas fa-tachometer-alt"></i> Dashboard
+          </a>
+        </li>
+
+        <!-- Reports Dropdown - Role Based -->
         <li class="nav-item dropdown" th:if="${#authorization.expression('isAuthenticated()')}">
           <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
-            Reports
+            <i class="fas fa-chart-bar"></i> Reports
           </a>
           <ul class="dropdown-menu">
-            <li><a class="dropdown-item" th:href="@{/reports/daily}">Daily Report</a></li>
-            <li><a class="dropdown-item" th:href="@{/reports/monthly}">Monthly Report</a></li>
-            <li><hr class="dropdown-divider"></li>
-            <li><a class="dropdown-item" th:href="@{/reports/custom}">Custom Report</a></li>
+            <!-- Admin Reports -->
+            <li th:if="${#authorization.expression('hasRole(''ADMIN'')')}">
+              <a class="dropdown-item" th:href="@{/admin/reports}">
+                <i class="fas fa-chart-pie"></i> System Reports
+              </a>
+            </li>
+            <!-- Supervisor Reports -->
+            <li th:if="${#authorization.expression('hasRole(''SUPERVISOR'')')}">
+              <a class="dropdown-item" th:href="@{/supervisor/reports}">
+                <i class="fas fa-users"></i> Team Performance
+              </a>
+            </li>
+            <!-- Staff Reports -->
+            <li th:if="${#authorization.expression('hasRole(''STAFF'')')}">
+              <a class="dropdown-item" th:href="@{/staff/reports}">
+                <i class="fas fa-tasks"></i> My Performance
+              </a>
+            </li>
+            <li th:if="${#authorization.expression('hasAnyRole(''ADMIN'', ''SUPERVISOR'')')}">
+              <hr class="dropdown-divider">
+            </li>
+            <!-- Task Status Report (All roles) -->
+            <li>
+              <a class="dropdown-item" th:href="@{/reports/task-status}">
+                <i class="fas fa-clipboard-list"></i> Task Status Report
+              </a>
+            </li>
+            <!-- Completion Report (Admin & Supervisor) -->
+            <li th:if="${#authorization.expression('hasAnyRole(''ADMIN'', ''SUPERVISOR'')')}">
+              <a class="dropdown-item" th:href="@{/reports/completion}">
+                <i class="fas fa-check-circle"></i> Completion Report
+              </a>
+            </li>
+            <!-- Export Data (Admin only) -->
+            <li th:if="${#authorization.expression('hasRole(''ADMIN'')')}">
+              <hr class="dropdown-divider">
+            </li>
+            <li th:if="${#authorization.expression('hasRole(''ADMIN'')')}">
+              <a class="dropdown-item" th:href="@{/reports/export}">
+                <i class="fas fa-download"></i> Export Data
+              </a>
+            </li>
           </ul>
         </li>
       </ul>
 
-      <!-- CENTER -->
-      <form class="d-flex mx-auto" style="max-width: 400px;">
-        <input class="form-control me-2" type="search" placeholder="Search">
-        <button class="btn btn-outline-success" type="submit">Search</button>
+      <!-- CENTER - Search -->
+      <form class="d-flex mx-auto" style="max-width: 400px;" th:action="@{/search}" method="get">
+        <input class="form-control me-2" type="search" name="q" placeholder="Search tasks, staff...">
+        <button class="btn btn-outline-success" type="submit">
+          <i class="fas fa-search"></i>
+        </button>
       </form>
 
       <!-- RIGHT -->
       <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
 
-        <!-- Logged in -->
-        <li class="nav-item dropdown" th:if="${#authorization.expression('isAuthenticated()')}">
-          <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
-            My Account
+        <!-- Notifications (Admin & Supervisor) -->
+        <li class="nav-item dropdown" th:if="${#authorization.expression('hasAnyRole(''ADMIN'', ''SUPERVISOR'')')}">
+          <a class="nav-link" href="#" data-bs-toggle="dropdown">
+            <i class="fas fa-bell"></i>
+            <span class="badge bg-danger" th:if="${pendingApprovalCount != null && pendingApprovalCount > 0}"
+                  th:text="${pendingApprovalCount}"></span>
           </a>
           <ul class="dropdown-menu dropdown-menu-end">
-            <li><a class="dropdown-item" th:href="@{/profile}">Profile</a></li>
-            <li><a class="dropdown-item" th:href="@{/profile/change-password}">Change Password</a></li>
+            <li><a class="dropdown-item" th:href="@{/notifications}">View All Notifications</a></li>
+            <li th:if="${pendingApprovalCount != null && pendingApprovalCount > 0}">
+              <a class="dropdown-item" th:href="@{/admin/pending-approvals}">
+                <span class="badge bg-warning me-2" th:text="${pendingApprovalCount}"></span> Pending Approvals
+              </a>
+            </li>
+          </ul>
+        </li>
+
+        <!-- Logged in User -->
+        <li class="nav-item dropdown" th:if="${#authorization.expression('isAuthenticated()')}">
+          <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
+            <i class="fas fa-user-circle"></i>
+            <span th:text="${#authentication.name}">User</span>
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li><a class="dropdown-item" th:href="@{/profile}">
+              <i class="fas fa-user"></i> Profile
+            </a></li>
+            <li><a class="dropdown-item" th:href="@{/profile/change-password}">
+              <i class="fas fa-key"></i> Change Password
+            </a></li>
             <li><hr class="dropdown-divider"></li>
             <li>
               <form th:action="@{/logout}" method="post">
-                <button type="submit" class="dropdown-item">Log Out</button>
+                <button type="submit" class="dropdown-item">
+                  <i class="fas fa-sign-out-alt"></i> Log Out
+                </button>
               </form>
             </li>
           </ul>
@@ -70,10 +155,14 @@
 
         <!-- Not logged in -->
         <li class="nav-item" th:if="${!#authorization.expression('isAuthenticated()')}">
-          <a class="nav-link" th:href="@{/auth/login}">Log In</a>
+          <a class="nav-link" th:href="@{/auth/login}">
+            <i class="fas fa-sign-in-alt"></i> Log In
+          </a>
         </li>
         <li class="nav-item" th:if="${!#authorization.expression('isAuthenticated()')}">
-          <a class="nav-link" th:href="@{/auth/register}">Register</a>
+          <a class="nav-link" th:href="@{/auth/register}">
+            <i class="fas fa-user-plus"></i> Register
+          </a>
         </li>
 
       </ul>
@@ -81,4 +170,3 @@
     </div>
   </div>
 </nav>
-

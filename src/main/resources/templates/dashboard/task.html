@@ -15,6 +15,9 @@
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet"/>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
     <!-- CSS -->
     <link rel="stylesheet" th:href="@{/css/styles.css}">
     <link rel="stylesheet" th:href="@{/css/quries.css}">
@@ -26,21 +29,24 @@
 
         .edit-disabled {
             opacity: 0.5;
-            cursor: not-allowed;
+            cursor: not-allowed !important;
         }
 
         .status-badge {
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-size: 11px;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
             font-weight: bold;
         }
 
-        .status-ASSIGNED { background-color: #FF986A; color: white; }
-        .status-INITIATED { background-color: #F16D34; color: white; }
-        .status-IN_PROGRESS { background-color: #161E54; color: white; }
-        .status-COMPLETED { background-color: #2ECC71; color: white; }
-        .status-APPROVED { background-color: #27ae60; color: white; }
+        .status-ASSIGNED { background-color: #6C757D; color: white; }
+        .status-INITIATED { background-color: #3498db; color: white; }
+        .status-IN_PROGRESS { background-color: #FF986A; color: white; }
+        .status-COMPLETED { background-color: #27ae60; color: white; }
+        .status-PENDING_REVIEW { background-color: #F1C40F; color: #333; }
+        .status-PENDING_APPROVAL { background-color: #F39C12; color: white; }
+        .status-REJECTED { background-color: #E76F51; color: white; }
+        .status-APPROVED { background-color: #2ECC71; color: white; }
 
         .warning-box {
             background-color: #FFF3CD;
@@ -48,6 +54,21 @@
             padding: 10px;
             margin-bottom: 15px;
             border-radius: 5px;
+        }
+
+        .description-cell {
+            max-width: 150px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .description-truncate {
+            display: inline-block;
+            max-width: 100px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
     </style>
 </head>
@@ -89,7 +110,10 @@
                         <option value="INITIATED">Initiated</option>
                         <option value="IN_PROGRESS">In Progress</option>
                         <option value="COMPLETED">Completed</option>
+                        <option value="PENDING_REVIEW">Pending Review</option>
+                        <option value="PENDING_APPROVAL">Pending Approval</option>
                         <option value="APPROVED">Approved</option>
+                        <option value="REJECTED">Rejected</option>
                     </select>
                     <small class="text-muted">Status cannot be changed directly - updated via task workflow</small>
                 </div>
@@ -117,20 +141,22 @@
 
     <div class="card p-3">
         <input type="text" id="taskSearch" class="form-control mb-3" placeholder="Search by task code...">
-        <table class="table table-bordered table-striped">
-            <thead>
-            <tr>
-                <th>Code</th>
-                <th>Description</th>
-                <th>Supervisor</th>
-                <th>Created By</th>
-                <th>Status</th>
-                <th>Quarter</th>
-                <th>Actions</th>
-            </tr>
-            </thead>
-            <tbody id="taskTable"></tbody>
-        </table>
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped">
+                <thead>
+                <tr>
+                    <th>Code</th>
+                    <th>Description</th>
+                    <th>Supervisor</th>
+                    <th>Created By</th>
+                    <th>Status</th>
+                    <th>Quarter</th>
+                    <th>Actions</th>
+                </tr>
+                </thead>
+                <tbody id="taskTable"></tbody>
+            </table>
+        </div>
         <div id="paginationContainer"></div>
     </div>
 </div>
@@ -139,9 +165,9 @@
 <div class="modal fade" id="viewTaskModal">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header bg-primary">
-                <h5 class="modal-title">Task Details</h5>
-                <button class="btn-close" data-bs-dismiss="modal"></button>
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="fas fa-eye"></i> Task Details</h5>
+                <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body" id="viewTaskBody"></div>
         </div>
@@ -152,9 +178,9 @@
 <div class="modal fade" id="deleteTaskModal">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header bg-danger">
-                <h5 class="modal-title">Confirm Delete</h5>
-                <button class="btn-close" data-bs-dismiss="modal"></button>
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="fas fa-trash"></i> Confirm Delete</h5>
+                <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body text-center">Are you sure you want to delete this task?</div>
             <div class="modal-footer">
@@ -187,11 +213,15 @@
 
         const deleteModal = new bootstrap.Modal(document.getElementById('deleteTaskModal'));
 
+        // ✅ COMPLETE STATUS MAP
         const statusMap = {
             "ASSIGNED": "Assigned",
             "INITIATED": "Initiated",
             "IN_PROGRESS": "In Progress",
             "COMPLETED": "Completed",
+            "PENDING_REVIEW": "Pending Review",
+            "PENDING_APPROVAL": "Pending Approval",
+            "REJECTED": "Rejected",
             "APPROVED": "Approved"
         };
 
@@ -201,6 +231,25 @@
             "Q3": "Q3",
             "Q4": "Q4"
         };
+
+        // ✅ WORKFLOW: Allowed next statuses
+        const allowedNextStatuses = {
+            "ASSIGNED": ["INITIATED"],
+            "INITIATED": ["IN_PROGRESS"],
+            "IN_PROGRESS": ["COMPLETED"],
+            "COMPLETED": ["PENDING_REVIEW"],
+            "PENDING_REVIEW": ["PENDING_APPROVAL", "APPROVED", "REJECTED"],
+            "PENDING_APPROVAL": ["APPROVED", "REJECTED"],
+            "REJECTED": ["IN_PROGRESS"],
+            "APPROVED": []
+        };
+
+        // ✅ Helper function to truncate text
+        function truncateText(text, maxLength = 20) {
+            if (!text) return '';
+            if (text.length <= maxLength) return text;
+            return text.substring(0, maxLength) + '...';
+        }
 
         function showToast(msg, type='success'){
             const color = type === 'success' ? '#161E54' : '#E76F51';
@@ -215,6 +264,11 @@
             return taskStatus === 'INITIATED';
         }
 
+        // Check if status is final
+        function isFinalStatus(status) {
+            return status === 'APPROVED' || status === 'COMPLETED';
+        }
+
         // Enable/disable form fields based on edit permission
         function setFormEditable(editable) {
             const formFields = ['#description', '#deadline', '#quarter', '#supervisorId', '#createdByCode'];
@@ -222,7 +276,6 @@
                 $(field).prop('disabled', !editable);
             });
 
-            // Always keep status disabled (should be managed by workflow)
             $('#taskStatus').prop('disabled', true);
 
             if (editable) {
@@ -240,11 +293,11 @@
         function resetFormToDefault() {
             $("#taskForm")[0].reset();
             $('#supervisorId, #createdByCode').val(null).trigger('change');
-            $("#taskStatus").val("INITIATED"); // Default to INITIATED as per your requirement
+            $("#taskStatus").val("INITIATED");
             $("#quarter").val("Q1");
             $("#taskId").val('');
             currentEditTaskStatus = null;
-            setFormEditable(true); // New tasks are editable
+            setFormEditable(true);
             $('#editWarning').hide();
         }
 
@@ -346,24 +399,29 @@
                     const canEdit = canEditTask(t.taskStatus);
                     const editDisabledClass = !canEdit ? 'edit-disabled' : '';
                     const editTitle = !canEdit ? 'Tasks can only be edited when status is INITIATED' : 'Edit task';
+                    const statusDisplay = statusMap[t.taskStatus] || t.taskStatus;
+
+                    // ✅ Truncate description to 20 characters
+                    const shortDesc = truncateText(t.description, 20);
+                    const fullDesc = t.description || '';
 
                     rows += `<tr>
                         <td>${t.taskCode ?? ''}</td>
-                        <td>${t.description ?? ''}</td>
+                        <td class="description-cell" title="${fullDesc}">${shortDesc}</td>
                         <td>${supervisorName}</td>
                         <td>${createdByName}</td>
-                        <td><span class="status-badge status-${t.taskStatus}">${statusMap[t.taskStatus] ?? ''}</span></td>
+                        <td><span class="status-badge status-${t.taskStatus}">${statusDisplay}</span></td>
                         <td>${quarterMap[t.quarter] ?? ''}</td>
                         <td>
-                            <button class="btn btn-primary btn-sm view-btn" data-id="${t.taskId}">View</button>
+                            <button class="btn btn-primary btn-sm view-btn" data-id="${t.taskId}"><i class="fas fa-eye"></i></button>
                             <button class="btn btn-warning btn-sm edit-btn ${editDisabledClass}"
                                     data-id="${t.taskId}"
                                     data-status="${t.taskStatus}"
                                     ${!canEdit ? 'disabled' : ''}
                                     title="${editTitle}">
-                                Edit
+                                <i class="fas fa-edit"></i>
                             </button>
-                            <button class="btn btn-danger btn-sm delete-btn" data-id="${t.taskId}">Delete</button>
+                            <button class="btn btn-danger btn-sm delete-btn" data-id="${t.taskId}"><i class="fas fa-trash"></i></button>
                         </td>
                     </tr>`;
                 });
@@ -442,7 +500,7 @@
                 <p><b>Description:</b> ${t.description}</p>
                 <p><b>Supervisor:</b> ${getSupervisorNameById(t.supervisorCode)}</p>
                 <p><b>Created By:</b> ${getUserNameByCode(t.createdByStaffCode)}</p>
-                <p><b>Status:</b> <span class="status-badge status-${t.taskStatus}">${statusMap[t.taskStatus] ?? ''}</span></p>
+                <p><b>Status:</b> <span class="status-badge status-${t.taskStatus}">${statusMap[t.taskStatus] ?? t.taskStatus}</span></p>
                 <p><b>Quarter:</b> ${quarterMap[t.quarter] ?? ''}</p>
                 <p><b>Deadline:</b> ${t.deadline ? t.deadline.replace('T', ' ') : 'N/A'}</p>
             `);
@@ -456,13 +514,11 @@
 
             if(!t) return;
 
-            // Check if task can be edited
             if (!canEditTask(taskStatus)) {
                 showToast(`Cannot edit task with status: ${statusMap[taskStatus]}. Only INITIATED tasks can be edited.`, "error");
                 return;
             }
 
-            // Populate form for editing
             $("#taskId").val(t.taskId);
             $("#description").val(t.description || '');
             $("#deadline").val(t.deadline ? t.deadline.substring(0, 16) : '');
@@ -481,7 +537,6 @@
             const id = $("#taskId").val();
             const taskStatus = $("#taskStatus").val();
 
-            // Double-check edit permission before saving
             if (id && !canEditTask(taskStatus)) {
                 showToast(`Cannot save task with status: ${statusMap[taskStatus]}. Only INITIATED tasks can be edited.`, "error");
                 return;

@@ -1,0 +1,588 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reports - Admin Dashboard</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" th:href="@{/css/styles.css}">
+  <link rel="stylesheet" th:href="@{/css/quries.css}">
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root {
+        --deep-navy: #161E54;
+        --light-blue: #BBE0EF;
+        --white: #FFFFFF;
+        --success-green: #2ECC71;
+        --vibrant-orange: #F16D34;
+    }
+
+    body {
+        background-color: var(--light-blue);
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        min-height: 100vh;
+    }
+
+    .container-custom {
+        padding: 20px;
+        margin-top: 70px;
+    }
+
+    .page-header {
+        background: var(--white);
+        border-radius: 15px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    .chart-card {
+        background: var(--white);
+        border-radius: 15px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    .btn-back {
+        background-color: var(--deep-navy);
+        border: none;
+        color: white;
+        border-radius: 20px;
+        padding: 8px 20px;
+    }
+
+    .btn-back:hover {
+        background-color: #0f1442;
+        color: white;
+    }
+
+    .table-card {
+        background: var(--white);
+        border-radius: 15px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    .chart-title {
+        color: var(--deep-navy);
+        font-weight: bold;
+        margin-bottom: 15px;
+        border-left: 4px solid var(--vibrant-orange);
+        padding-left: 15px;
+    }
+
+    .filter-bar {
+        background: var(--white);
+        border-radius: 15px;
+        padding: 15px 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    .btn-print {
+        background-color: var(--deep-navy);
+        border: none;
+        color: white;
+        border-radius: 20px;
+        padding: 6px 15px;
+        font-size: 13px;
+    }
+
+    .btn-print:hover {
+        background-color: #0f1442;
+        color: white;
+    }
+
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+    }
+
+    .period-badge {
+        background-color: #e9ecef;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 13px;
+    }
+
+    .date-range-box {
+        background: linear-gradient(135deg, var(--deep-navy), #2a3f8a);
+        color: white;
+        padding: 15px 20px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+    }
+
+    @media print {
+        body { background-color: white; }
+        .navbar, .btn-back, .filter-bar, .btn-print, .no-print, .btn, .date-range-box { display: none !important; }
+        .container-custom { margin-top: 0; padding: 10px; }
+        .table-card { box-shadow: none; border: 1px solid #ddd; page-break-inside: avoid; }
+        .chart-title { border-left-color: #333; }
+        .print-header { display: block !important; }
+    }
+
+    .print-header {
+        display: none;
+        margin-bottom: 20px;
+        border-bottom: 2px solid #161E54;
+        padding-bottom: 10px;
+    }
+  </style>
+</head>
+
+<body>
+<div th:replace="~{layout/navbar :: navbar}"></div>
+
+<div class="container-custom">
+  <div class="container-fluid">
+
+    <!-- Header -->
+    <div class="page-header">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h2><i class="fas fa-chart-bar"></i> Reports & Analytics</h2>
+          <p class="text-muted mb-0">System-wide statistics and performance reports</p>
+        </div>
+        <div>
+          <a th:href="@{/admin/dashboard}" class="btn btn-back me-2">
+            <i class="fas fa-arrow-left"></i> Back to Dashboard
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Date Range Selection Box -->
+    <div class="date-range-box no-print">
+      <div class="row align-items-center">
+        <div class="col-md-4">
+          <label class="fw-bold mb-2"><i class="fas fa-calendar-alt"></i> Select Report Period</label>
+          <div class="d-flex gap-2">
+            <input type="date" id="printStartDate" class="form-control" placeholder="Start Date">
+            <span class="text-white align-self-center">to</span>
+            <input type="date" id="printEndDate" class="form-control" placeholder="End Date">
+          </div>
+        </div>
+        <div class="col-md-3">
+          <label class="fw-bold mb-2"><i class="fas fa-filter"></i> Quick Select</label>
+          <select id="quickPeriodSelect" class="form-select">
+            <option value="">Custom Range</option>
+            <option value="thisMonth">This Month</option>
+            <option value="lastMonth">Last Month</option>
+            <option value="thisQuarter">This Quarter</option>
+            <option value="lastQuarter">Last Quarter</option>
+            <option value="thisYear">This Year</option>
+            <option value="lastYear">Last Year</option>
+            <option value="allTime">All Time</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="fw-bold mb-2"><i class="fas fa-chart-bar"></i> Quarter</label>
+          <select id="printQuarterFilter" class="form-select">
+            <option value="ALL">All Quarters</option>
+            <option value="Q1">Q1</option>
+            <option value="Q2">Q2</option>
+            <option value="Q3">Q3</option>
+            <option value="Q4">Q4</option>
+          </select>
+        </div>
+        <div class="col-md-2 text-end">
+          <label class="fw-bold mb-2">&nbsp;</label>
+          <button class="btn btn-light w-100" id="applyPrintFilterBtn">
+            <i class="fas fa-check"></i> Apply to Reports
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Current Period Display -->
+    <div class="alert alert-info no-print">
+      <i class="fas fa-info-circle"></i>
+      <strong>Current Report Period:</strong> <span id="currentPeriodDisplay">All Time</span>
+    </div>
+
+    <!-- Task Status and Monthly Charts -->
+    <div class="row">
+      <div class="col-md-6">
+        <div class="chart-card">
+          <h5 class="chart-title"><i class="fas fa-chart-pie"></i> Task Status Distribution</h5>
+          <canvas id="taskStatusChart" height="250"></canvas>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="chart-card">
+          <h5 class="chart-title"><i class="fas fa-chart-line"></i> Monthly Completions</h5>
+          <canvas id="monthlyChart" height="250"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Branch Performance -->
+    <div class="table-card" id="branchPerformanceSection">
+      <div class="section-header">
+        <h5 class="chart-title"><i class="fas fa-code-branch"></i> Branch Performance</h5>
+        <div>
+          <span class="period-badge me-2" id="branchPeriodDisplay">
+            <i class="fas fa-calendar"></i> <span id="branchPeriodText">All Time</span>
+          </span>
+          <button class="btn-print no-print" onclick="printSection('branchPerformanceSection', 'Branch Performance Report')">
+            <i class="fas fa-print"></i> Print Branch Report
+          </button>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead>
+          <tr>
+            <th>Branch</th>
+            <th>Total Tasks</th>
+            <th>Completed</th>
+            <th>In Progress</th>
+            <th>Pending</th>
+            <th>Completion Rate</th>
+          </tr>
+          </thead>
+          <tbody id="branchTableBody">
+          <tr th:each="branch : ${branchPerformance}">
+            <td><strong th:text="${branch.branchName}"></strong></td>
+            <td th:text="${branch.totalTasks}">0</td>
+            <td th:text="${branch.completedTasks}">0</td>
+            <td th:text="${branch.inProgressTasks != null ? branch.inProgressTasks : 0}">0</td>
+            <td th:text="${branch.pendingTasks != null ? branch.pendingTasks : 0}">0</td>
+            <td>
+              <div class="progress" style="height: 20px;">
+                <div class="progress-bar bg-success" role="progressbar"
+                     th:style="'width:' + ${branch.completionRate} + '%'"
+                     th:text="${#numbers.formatDecimal(branch.completionRate, 1, 1) + '%'}"></div>
+              </div>
+            </td>
+          </tr>
+          <tr th:if="${branchPerformance == null || branchPerformance.isEmpty()}">
+            <td colspan="6" class="text-center">No branch data available</td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Department Performance -->
+    <div class="table-card" id="departmentPerformanceSection">
+      <div class="section-header">
+        <h5 class="chart-title"><i class="fas fa-building"></i> Department Performance</h5>
+        <div>
+          <span class="period-badge me-2" id="deptPeriodDisplay">
+            <i class="fas fa-calendar"></i> <span id="deptPeriodText">All Time</span>
+          </span>
+          <button class="btn-print no-print" onclick="printSection('departmentPerformanceSection', 'Department Performance Report')">
+            <i class="fas fa-print"></i> Print Department Report
+          </button>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead>
+          <tr>
+            <th>Branch</th>
+            <th>Department</th>
+            <th>Total Tasks</th>
+            <th>Completed</th>
+            <th>In Progress</th>
+            <th>Completion Rate</th>
+          </tr>
+          </thead>
+          <tbody id="deptTableBody">
+          <tr th:each="dept : ${departmentPerformance}">
+            <td th:text="${dept.branchName}">Accra</td>
+            <td><strong th:text="${dept.departmentName}"></strong></td>
+            <td th:text="${dept.totalTasks}">0</td>
+            <td th:text="${dept.completedTasks}">0</td>
+            <td th:text="${dept.inProgressTasks != null ? dept.inProgressTasks : 0}">0</td>
+            <td>
+              <div class="progress" style="height: 20px;">
+                <div class="progress-bar bg-success" role="progressbar"
+                     th:style="'width:' + ${dept.completionRate} + '%'"
+                     th:text="${#numbers.formatDecimal(dept.completionRate, 1, 1) + '%'}"></div>
+              </div>
+            </td>
+          </tr>
+          <tr th:if="${departmentPerformance == null || departmentPerformance.isEmpty()}">
+            <td colspan="6" class="text-center">No department data available</td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Staff Performance Table -->
+    <div class="table-card" id="staffPerformanceSection">
+      <div class="section-header">
+        <h5 class="chart-title"><i class="fas fa-trophy"></i> Staff Performance</h5>
+        <div>
+          <span class="period-badge me-2" id="staffPeriodDisplay">
+            <i class="fas fa-calendar"></i> <span id="staffPeriodText">All Time</span>
+          </span>
+          <button class="btn-print no-print" onclick="printSection('staffPerformanceSection', 'Staff Performance Report')">
+            <i class="fas fa-print"></i> Print Staff Report
+          </button>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead>
+          <tr>
+            <th>Staff Code</th>
+            <th>Name</th>
+            <th>Department</th>
+            <th>Branch</th>
+            <th>Total Tasks</th>
+            <th>Completed</th>
+            <th>In Progress</th>
+            <th>Completion Rate</th>
+          </tr>
+          </thead>
+          <tbody id="staffTableBody">
+          <tr th:each="staff : ${staffPerformance}">
+            <td th:text="${staff.staffCode}">1000001</td>
+            <td th:text="${staff.staffName}">Staff Name</td>
+            <td th:text="${staff.department}">Dept</td>
+            <td th:text="${staff.branch}">Branch</td>
+            <td th:text="${staff.totalTasks}">0</td>
+            <td th:text="${staff.completedTasks}">0</td>
+            <td th:text="${staff.inProgressTasks != null ? staff.inProgressTasks : 0}">0</td>
+            <td>
+              <div class="progress" style="height: 20px;">
+                <div class="progress-bar bg-success" role="progressbar"
+                     th:style="'width:' + ${staff.completionRate} + '%'"
+                     th:text="${#numbers.formatDecimal(staff.completionRate, 1, 1) + '%'}"></div>
+              </div>
+            </td>
+          </tr>
+          <tr th:if="${staffPerformance == null || staffPerformance.isEmpty()}">
+            <td colspan="8" class="text-center">No performance data available</td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+  // Print individual section
+  function printSection(sectionId, reportTitle) {
+      const section = document.getElementById(sectionId);
+      const originalTitle = document.title;
+      const periodText = document.getElementById('currentPeriodDisplay').textContent;
+
+      document.title = reportTitle + ' - TES';
+
+      const printWindow = window.open('', '_blank');
+      printWindow.document.write(`
+          <!doctype html>
+          <html>
+          <head>
+              <title>${reportTitle} - TES</title>
+              <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+              <style>
+                  body { padding: 30px; font-family: 'Segoe UI', sans-serif; }
+                  .print-header { margin-bottom: 25px; border-bottom: 2px solid #161E54; padding-bottom: 15px; }
+                  .print-header h2 { color: #161E54; }
+                  .print-header h3 { color: #333; }
+                  .table { margin-top: 20px; }
+                  .table th { background-color: #f8f9fa; }
+                  .progress { height: 20px; }
+                  .bg-success { background-color: #2ECC71 !important; }
+                  .period-info { background-color: #e9ecef; padding: 8px 15px; border-radius: 5px; display: inline-block; }
+              </style>
+          </head>
+          <body>
+              <div class="print-header">
+                  <h2>TASK EVALUATION SYSTEM</h2>
+                  <h3>${reportTitle}</h3>
+                  <p><span class="period-info"><i class="fas fa-calendar"></i> Period: ${periodText}</span></p>
+                  <p>Generated: ${new Date().toLocaleString()}</p>
+              </div>
+              ${section.cloneNode(true).outerHTML}
+          </body>
+          </html>
+      `);
+
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => {
+          printWindow.print();
+          printWindow.close();
+          document.title = originalTitle;
+      }, 500);
+  }
+
+  $(document).ready(function() {
+      // Initialize Select2
+      $('#printQuarterFilter, #quickPeriodSelect').select2({
+          placeholder: 'Select...',
+          allowClear: true,
+          width: '100%'
+      });
+
+      // Set default dates (current year)
+      const today = new Date();
+      const firstOfYear = new Date(today.getFullYear(), 0, 1);
+      $('#printStartDate').val(firstOfYear.toISOString().split('T')[0]);
+      $('#printEndDate').val(today.toISOString().split('T')[0]);
+
+      // Quick period select
+      $('#quickPeriodSelect').on('change', function() {
+          const period = $(this).val();
+          const now = new Date();
+          let startDate, endDate;
+
+          switch(period) {
+              case 'thisMonth':
+                  startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+                  endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                  break;
+              case 'lastMonth':
+                  startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                  endDate = new Date(now.getFullYear(), now.getMonth(), 0);
+                  break;
+              case 'thisQuarter':
+                  const quarter = Math.floor(now.getMonth() / 3);
+                  startDate = new Date(now.getFullYear(), quarter * 3, 1);
+                  endDate = new Date(now.getFullYear(), (quarter + 1) * 3, 0);
+                  break;
+              case 'lastQuarter':
+                  const lastQ = Math.floor(now.getMonth() / 3) - 1;
+                  startDate = new Date(now.getFullYear(), lastQ * 3, 1);
+                  endDate = new Date(now.getFullYear(), (lastQ + 1) * 3, 0);
+                  break;
+              case 'thisYear':
+                  startDate = new Date(now.getFullYear(), 0, 1);
+                  endDate = new Date(now.getFullYear(), 11, 31);
+                  break;
+              case 'lastYear':
+                  startDate = new Date(now.getFullYear() - 1, 0, 1);
+                  endDate = new Date(now.getFullYear() - 1, 11, 31);
+                  break;
+              case 'allTime':
+                  startDate = new Date(2020, 0, 1);
+                  endDate = today;
+                  break;
+              default:
+                  return;
+          }
+
+          $('#printStartDate').val(startDate.toISOString().split('T')[0]);
+          $('#printEndDate').val(endDate.toISOString().split('T')[0]);
+          updatePeriodDisplay();
+      });
+
+      // Update period display
+      function updatePeriodDisplay() {
+          const start = $('#printStartDate').val();
+          const end = $('#printEndDate').val();
+          const quarter = $('#printQuarterFilter').val();
+
+          let periodText = 'All Time';
+          if (start && end) {
+              periodText = `${start} to ${end}`;
+          }
+          if (quarter && quarter !== 'ALL') {
+              periodText += ` (${quarter})`;
+          }
+
+          $('#currentPeriodDisplay').text(periodText);
+          $('#branchPeriodText, #deptPeriodText, #staffPeriodText').text(periodText);
+      }
+
+      $('#printStartDate, #printEndDate, #printQuarterFilter').on('change', updatePeriodDisplay);
+      updatePeriodDisplay();
+
+      // Apply print filter - reload page with parameters
+      $('#applyPrintFilterBtn').click(function() {
+          const startDate = $('#printStartDate').val();
+          const endDate = $('#printEndDate').val();
+          const quarter = $('#printQuarterFilter').val();
+
+          let url = '/admin/reports?';
+          if (startDate) url += 'startDate=' + startDate + '&';
+          if (endDate) url += 'endDate=' + endDate + '&';
+          if (quarter && quarter !== 'ALL') url += 'quarter=' + quarter;
+
+          window.location.href = url;
+      });
+
+      // Task Status Chart
+      const taskStatusData = /*[[${taskStatusCounts}]]*/ {};
+      const taskStatusCtx = document.getElementById('taskStatusChart').getContext('2d');
+
+      if (Object.keys(taskStatusData).length > 0) {
+          new Chart(taskStatusCtx, {
+              type: 'doughnut',
+              data: {
+                  labels: Object.keys(taskStatusData).map(k => {
+                      const map = {'ASSIGNED':'Assigned','INITIATED':'Initiated','IN_PROGRESS':'In Progress',
+                                  'COMPLETED':'Completed','PENDING_REVIEW':'Pending Review',
+                                  'PENDING_APPROVAL':'Pending Approval','APPROVED':'Approved','REJECTED':'Rejected'};
+                      return map[k] || k;
+                  }),
+                  datasets: [{
+                      data: Object.values(taskStatusData),
+                      backgroundColor: ['#F16D34', '#FF986A', '#161E54', '#27ae60', '#F1C40F', '#f39c12', '#2ECC71', '#E76F51']
+                  }]
+              },
+              options: {
+                  responsive: true,
+                  maintainAspectRatio: true,
+                  aspectRatio: 2,
+                  plugins: {
+                      legend: { position: 'right', labels: { boxWidth: 15, padding: 10 } }
+                  }
+              }
+          });
+      }
+
+      // Monthly Chart
+      const monthlyData = /*[[${monthlyCompletions}]]*/ {};
+      const monthlyCtx = document.getElementById('monthlyChart').getContext('2d');
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const sortedData = months.map((_, i) => monthlyData[String(i + 1).padStart(2, '0')] || 0);
+
+      if (sortedData.some(val => val > 0)) {
+          new Chart(monthlyCtx, {
+              type: 'bar',
+              data: {
+                  labels: months,
+                  datasets: [{
+                      label: 'Completed Tasks',
+                      data: sortedData,
+                      backgroundColor: '#2ECC71',
+                      borderRadius: 5
+                  }]
+              },
+              options: {
+                  responsive: true,
+                  maintainAspectRatio: true,
+                  aspectRatio: 2,
+                  plugins: { legend: { display: false } },
+                  scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+              }
+          });
+      }
+  });
+</script>
+</body>
+</html>

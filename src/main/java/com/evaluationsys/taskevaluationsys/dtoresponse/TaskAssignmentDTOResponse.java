@@ -9,6 +9,7 @@ public class TaskAssignmentDTOResponse {
     private String taskAssignCode;
     private Long taskId;
     private String taskDescription;
+    private LocalDateTime taskDeadline;  // ✅ ADDED THIS FIELD
 
     private Long staffId;
     private String staffFirstName;
@@ -26,11 +27,12 @@ public class TaskAssignmentDTOResponse {
 
     public TaskAssignmentDTOResponse() {}
 
-    // ✅ FINAL CORRECT CONSTRUCTOR
+    // ✅ UPDATED CONSTRUCTOR WITH taskDeadline
     public TaskAssignmentDTOResponse(
             String taskAssignCode,
             Long taskId,
             String taskDescription,
+            LocalDateTime taskDeadline,     // ✅ ADDED
             Long staffId,
             String staffFirstName,
             String staffOtherName,
@@ -42,6 +44,7 @@ public class TaskAssignmentDTOResponse {
         this.taskAssignCode = taskAssignCode;
         this.taskId = taskId;
         this.taskDescription = taskDescription;
+        this.taskDeadline = taskDeadline;   // ✅ ADDED
         this.staffId = staffId;
         this.staffFirstName = staffFirstName;
         this.staffOtherName = staffOtherName;
@@ -117,6 +120,10 @@ public class TaskAssignmentDTOResponse {
     public String getTaskDescription() { return taskDescription; }
     public void setTaskDescription(String taskDescription) { this.taskDescription = taskDescription; }
 
+    // ✅ ADDED GETTER AND SETTER FOR DEADLINE
+    public LocalDateTime getTaskDeadline() { return taskDeadline; }
+    public void setTaskDeadline(LocalDateTime taskDeadline) { this.taskDeadline = taskDeadline; }
+
     public Long getStaffId() { return staffId; }
     public void setStaffId(Long staffId) { this.staffId = staffId; }
 
@@ -180,12 +187,29 @@ public class TaskAssignmentDTOResponse {
         };
     }
 
+    // ✅ ADDED DEADLINE HELPER METHODS
+    public boolean isOverdue() {
+        return taskDeadline != null && LocalDateTime.now().isAfter(taskDeadline);
+    }
+
+    public String getDeadlineStatus() {
+        if (taskDeadline == null) return "none";
+        if (isOverdue()) return "overdue";
+
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime warning = taskDeadline.minusDays(3);
+
+        if (now.isAfter(warning)) return "warning";
+        return "ok";
+    }
+
     @Override
     public String toString() {
         return "TaskAssignmentDTOResponse{" +
                 "taskAssignCode='" + taskAssignCode + '\'' +
                 ", taskId=" + taskId +
                 ", taskDescription='" + taskDescription + '\'' +
+                ", taskDeadline=" + taskDeadline +
                 ", staffId=" + staffId +
                 ", staffFullName='" + getStaffFullName() + '\'' +
                 ", assignedAt=" + assignedAt +

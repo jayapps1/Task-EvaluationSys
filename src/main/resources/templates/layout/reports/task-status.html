@@ -1,0 +1,385 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${pageTitle}">Task Status Report - TES</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" th:href="@{/css/styles.css}">
+    <link rel="stylesheet" th:href="@{/css/quries.css}">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        :root {
+            --deep-navy: #161E54;
+            --light-blue: #BBE0EF;
+            --white: #FFFFFF;
+            --success-green: #2ECC71;
+            --warning-yellow: #F1C40F;
+            --error-red: #E76F51;
+            --vibrant-orange: #F16D34;
+        }
+
+        body {
+            background-color: var(--light-blue);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+        }
+
+        .container-custom {
+            padding: 20px;
+            margin-top: 70px;
+        }
+
+        .page-header {
+            background: var(--white);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .chart-card {
+            background: var(--white);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .stats-card {
+            background: var(--white);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .filter-bar {
+            background: var(--white);
+            border-radius: 15px;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .btn-back {
+            background-color: var(--deep-navy);
+            border: none;
+            color: white;
+            border-radius: 20px;
+            padding: 8px 20px;
+        }
+
+        .btn-back:hover {
+            background-color: #0f1442;
+            color: white;
+        }
+
+        .chart-title {
+            color: var(--deep-navy);
+            font-weight: bold;
+            margin-bottom: 15px;
+            border-left: 4px solid var(--vibrant-orange);
+            padding-left: 15px;
+        }
+
+        .status-badge {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .status-ASSIGNED { background-color: #F16D34; color: white; }
+        .status-INITIATED { background-color: #FF986A; color: white; }
+        .status-IN_PROGRESS { background-color: #161E54; color: white; }
+        .status-COMPLETED { background-color: #27ae60; color: white; }
+        .status-PENDING_REVIEW { background-color: #F1C40F; color: #333; }
+        .status-PENDING_APPROVAL { background-color: #f39c12; color: white; }
+        .status-APPROVED { background-color: #2ECC71; color: white; }
+        .status-REJECTED { background-color: #E76F51; color: white; }
+
+        .total-card {
+            background: linear-gradient(135deg, var(--deep-navy), #2a3f8a);
+            color: white;
+        }
+
+        @media print {
+            body * { visibility: hidden; }
+            #printableReport, #printableReport * { visibility: visible; }
+            #printableReport { position: absolute; left: 0; top: 0; width: 100%; padding: 20px; }
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            .status-badge, .progress-bar, .badge { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+
+        .print-only { display: none; }
+    </style>
+</head>
+
+<body>
+<div th:replace="~{layout/navbar :: navbar}"></div>
+
+<div class="container-custom">
+    <div class="container-fluid">
+
+        <div class="page-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="fas fa-chart-pie"></i> <span th:text="${pageTitle}">Task Status Report</span></h2>
+                    <p class="text-muted mb-0">Overview of all tasks by their current status</p>
+                </div>
+                <div>
+                    <a th:href="@{/admin/dashboard}" class="btn btn-back me-2">
+                        <i class="fas fa-arrow-left"></i> Dashboard
+                    </a>
+                    <button class="btn btn-success" onclick="printDetailedReport()">
+                        <i class="fas fa-print"></i> Print Detailed Report
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="filter-bar">
+            <div class="row align-items-center">
+                <div class="col-md-3">
+                    <label><i class="fas fa-filter"></i> Branch:</label>
+                    <select id="branchFilter" class="form-select">
+                        <option value="ALL">All Branches</option>
+                        <option th:each="branch : ${branches}" th:value="${branch.branchId}" th:text="${branch.branchName}" th:selected="${selectedBranch != null && selectedBranch == branch.branchId}"></option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label><i class="fas fa-filter"></i> Department:</label>
+                    <select id="departmentFilter" class="form-select">
+                        <option value="ALL">All Departments</option>
+                        <option th:each="dept : ${departments}" th:value="${dept.departmentId}" th:text="${dept.departmentName}" th:selected="${selectedDepartment != null && selectedDepartment == dept.departmentId}"></option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label><i class="fas fa-calendar"></i> Quarter:</label>
+                    <select id="quarterFilter" class="form-select">
+                        <option value="ALL">All Quarters</option>
+                        <option value="Q1" th:selected="${selectedQuarter == 'Q1'}">Q1</option>
+                        <option value="Q2" th:selected="${selectedQuarter == 'Q2'}">Q2</option>
+                        <option value="Q3" th:selected="${selectedQuarter == 'Q3'}">Q3</option>
+                        <option value="Q4" th:selected="${selectedQuarter == 'Q4'}">Q4</option>
+                    </select>
+                </div>
+                <div class="col-md-3 text-end">
+                    <button class="btn btn-primary" id="applyFilterBtn"><i class="fas fa-search"></i> Apply Filters</button>
+                    <button class="btn btn-secondary" id="resetFilterBtn"><i class="fas fa-undo"></i> Reset</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-4">
+                <div class="stats-card total-card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-tasks fa-3x mb-3"></i>
+                        <h2 th:text="${totalTasks}">0</h2>
+                        <p class="mb-0">Total Tasks</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div class="stats-card">
+                    <div class="card-body">
+                        <h5 class="chart-title"><i class="fas fa-info-circle"></i> Report Summary</h5>
+                        <!-- ✅ SIMPLIFIED: Show filter message without complex expressions -->
+                        <p th:if="${selectedBranch != null || selectedDepartment != null || (selectedQuarter != null && selectedQuarter != 'ALL')}">
+                            <i class="fas fa-filter"></i> Filters applied.
+                            <span th:if="${selectedBranch != null}">Branch ID: [[${selectedBranch}]]</span>
+                            <span th:if="${selectedDepartment != null}"> | Dept ID: [[${selectedDepartment}]]</span>
+                            <span th:if="${selectedQuarter != null && selectedQuarter != 'ALL'}"> | Quarter: [[${selectedQuarter}]]</span>
+                        </p>
+                        <p th:unless="${selectedBranch != null || selectedDepartment != null || (selectedQuarter != null && selectedQuarter != 'ALL')}">
+                            Showing all tasks across all branches and departments.
+                        </p>
+                        <p class="mb-0"><i class="fas fa-calendar"></i> Generated: <span th:text="${#temporals.format(#temporals.createNow(), 'yyyy-MM-dd HH:mm')}"></span></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="chart-card">
+                    <h5 class="chart-title"><i class="fas fa-chart-pie"></i> Status Distribution</h5>
+                    <canvas id="taskStatusChart" height="280"></canvas>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="chart-card">
+                    <h5 class="chart-title"><i class="fas fa-list"></i> Status Breakdown</h5>
+                    <div id="statusCardsContainer"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <h5 class="chart-title"><i class="fas fa-table"></i> Detailed Status Report</h5>
+            <div class="table-responsive">
+                <table class="table table-hover table-bordered">
+                    <thead class="table-light">
+                    <tr><th>Status</th><th>Count</th><th>Percentage</th><th>Distribution</th></tr>
+                    </thead>
+                    <tbody id="statusTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="printableReport" class="print-only">
+    <div class="print-header">
+        <div class="print-title"><i class="fas fa-table"></i> Detailed Task Status Report</div>
+        <div id="printFilterSummary" class="print-filters"></div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-bordered">
+            <thead><tr><th>Status</th><th>Count</th><th>Percentage</th><th>Distribution</th></tr></thead>
+            <tbody id="printTableBody"></tbody>
+        </table>
+    </div>
+    <div class="print-footer"><i class="fas fa-calendar"></i> Generated: <span id="printDate"></span></div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    let taskStatusData = {};
+    let totalTasks = 0;
+
+    const statusColors = {
+        'ASSIGNED': '#F16D34', 'INITIATED': '#FF986A', 'IN_PROGRESS': '#161E54',
+        'COMPLETED': '#27ae60', 'PENDING_REVIEW': '#F1C40F', 'PENDING_APPROVAL': '#f39c12',
+        'APPROVED': '#2ECC71', 'REJECTED': '#E76F51'
+    };
+
+    const statusDisplayNames = {
+        'ASSIGNED': 'Assigned', 'INITIATED': 'Initiated', 'IN_PROGRESS': 'In Progress',
+        'COMPLETED': 'Completed', 'PENDING_REVIEW': 'Pending Review',
+        'PENDING_APPROVAL': 'Pending Approval', 'APPROVED': 'Approved', 'REJECTED': 'Rejected'
+    };
+
+    $(document).ready(function() {
+        $('#branchFilter, #departmentFilter, #quarterFilter').select2({
+            placeholder: 'Select...', allowClear: true, width: '100%'
+        });
+
+        try {
+            taskStatusData = /*[[${taskStatusCounts != null ? taskStatusCounts : {}}]]*/ {};
+            totalTasks = /*[[${totalTasks != null ? totalTasks : 0}]]*/ 0;
+        } catch (e) {
+            console.error('Error parsing data:', e);
+        }
+
+        console.log('Data:', taskStatusData, 'Total:', totalTasks);
+
+        renderAll();
+
+        $('#applyFilterBtn').click(function() {
+            const branch = $('#branchFilter').val(), dept = $('#departmentFilter').val(), quarter = $('#quarterFilter').val();
+            let url = '/reports/task-status?';
+            if (branch && branch !== 'ALL') url += 'branchId=' + branch + '&';
+            if (dept && dept !== 'ALL') url += 'deptId=' + dept + '&';
+            if (quarter && quarter !== 'ALL') url += 'quarter=' + quarter;
+            window.location.href = url;
+        });
+
+        $('#resetFilterBtn').click(() => window.location.href = '/reports/task-status');
+    });
+
+    function renderAll() {
+        const hasData = taskStatusData && typeof taskStatusData === 'object' && Object.keys(taskStatusData).length > 0 && totalTasks > 0;
+
+        if (hasData) {
+            renderChart();
+            renderCards();
+            renderTable('statusTableBody');
+        } else {
+            $('#taskStatusChart').parent().html('<p class="text-center text-muted p-5">No task data available</p>');
+            $('#statusCardsContainer').html('<p class="text-center text-muted p-3">No task data available</p>');
+            $('#statusTableBody').html('<tr><td colspan="4" class="text-center">No data available</td></tr>');
+        }
+    }
+
+    function renderChart() {
+        const ctx = document.getElementById('taskStatusChart').getContext('2d');
+        const labels = Object.keys(taskStatusData).map(k => statusDisplayNames[k] || k);
+        const data = Object.values(taskStatusData);
+        const colors = Object.keys(taskStatusData).map(k => statusColors[k] || '#6C757D');
+
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 2, borderColor: '#fff' }] },
+            options: {
+                responsive: true, maintainAspectRatio: true, aspectRatio: 1.5,
+                plugins: {
+                    legend: { position: 'right', labels: { boxWidth: 15, padding: 15 } },
+                    tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${ctx.raw} (${((ctx.raw/totalTasks)*100).toFixed(1)}%)` } }
+                }
+            }
+        });
+    }
+
+    function renderCards() {
+        let html = '<div class="row">';
+        Object.entries(taskStatusData).forEach(([status, count]) => {
+            const pct = ((count / totalTasks) * 100).toFixed(1);
+            const name = statusDisplayNames[status] || status;
+            const color = statusColors[status] || '#6C757D';
+            html += `<div class="col-md-6 mb-3"><div class="d-flex align-items-center p-2 border rounded">
+                <div style="width:12px;height:12px;border-radius:50%;background:${color};margin-right:10px;"></div>
+                <div class="flex-grow-1"><strong>${name}</strong><div class="d-flex justify-content-between"><span>${count} tasks</span><span>${pct}%</span></div>
+                <div class="progress" style="height:6px;"><div class="progress-bar" style="width:${pct}%;background:${color};"></div></div></div></div></div>`;
+        });
+        html += '</div>';
+        $('#statusCardsContainer').html(html);
+    }
+
+    function renderTable(tbodyId) {
+        let html = '';
+        Object.entries(taskStatusData).forEach(([status, count]) => {
+            const pct = ((count / totalTasks) * 100).toFixed(1);
+            const name = statusDisplayNames[status] || status;
+            const color = statusColors[status] || '#6C757D';
+            html += `<tr><td><span class="status-badge" style="background:${color};">${name}</span></td>
+                <td><strong>${count}</strong></td><td>${pct}%</td>
+                <td><div class="progress" style="height:20px;"><div class="progress-bar" style="width:${pct}%;background:${color};">${pct}%</div></div></td></tr>`;
+        });
+        html += `<tr class="table-secondary fw-bold"><td>TOTAL</td><td>${totalTasks}</td><td>100%</td><td><div class="progress" style="height:20px;"><div class="progress-bar bg-secondary" style="width:100%;">100%</div></div></td></tr>`;
+        $('#' + tbodyId).html(html);
+    }
+
+    function getFilterSummary() {
+        const branch = $('#branchFilter option:selected').text(), dept = $('#departmentFilter option:selected').text(), quarter = $('#quarterFilter option:selected').text();
+        if (branch === 'All Branches' && dept === 'All Departments' && quarter === 'All Quarters') return '<p><i class="fas fa-info-circle"></i> Showing all tasks.</p>';
+        let summary = '<p><i class="fas fa-filter"></i> Filtered by: ';
+        const filters = [];
+        if (branch !== 'All Branches') filters.push(`<span class="badge bg-primary">Branch: ${branch}</span>`);
+        if (dept !== 'All Departments') filters.push(`<span class="badge bg-info">Department: ${dept}</span>`);
+        if (quarter !== 'All Quarters') filters.push(`<span class="badge bg-success">Quarter: ${quarter}</span>`);
+        return summary + filters.join(' ') + '</p>';
+    }
+
+    function printDetailedReport() {
+        renderTable('printTableBody');
+        $('#printFilterSummary').html(getFilterSummary());
+        $('#printDate').text(new Date().toLocaleString());
+        window.print();
+    }
+
+    document.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'p') { e.preventDefault(); printDetailedReport(); } });
+</script>
+</body>
+</html>

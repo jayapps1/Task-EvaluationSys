@@ -1,0 +1,249 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Staff Management - Admin Dashboard</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" th:href="@{/css/styles.css}">
+    <link rel="stylesheet" th:href="@{/css/quries.css}">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+
+    <style>
+        :root {
+            --deep-navy: #161E54;
+            --light-blue: #BBE0EF;
+            --white: #FFFFFF;
+        }
+
+        body {
+            background-color: var(--light-blue);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+        }
+
+        .container-custom {
+            padding: 20px;
+            margin-top: 70px;
+        }
+
+        .page-header {
+            background: var(--white);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .table-card {
+            background: var(--white);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .btn-back {
+            background-color: var(--deep-navy);
+            border: none;
+            color: white;
+            border-radius: 20px;
+            padding: 8px 20px;
+        }
+    </style>
+</head>
+
+<body>
+<div th:replace="~{layout/navbar :: navbar}"></div>
+
+<div class="container-custom">
+    <div class="container-fluid">
+
+        <!-- Header -->
+        <div class="page-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="fas fa-users"></i> Staff Management</h2>
+                    <p class="text-muted mb-0">View and manage all staff members</p>
+                </div>
+                <a th:href="@{/admin/dashboard}" class="btn btn-back">
+                    <i class="fas fa-arrow-left"></i> Back to Dashboard
+                </a>
+            </div>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <select id="branchFilter" class="form-select">
+                    <option value="ALL">All Branches</option>
+                    <option th:each="branch : ${branches}" th:value="${branch.branchId}" th:text="${branch.branchName}"></option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <select id="departmentFilter" class="form-select">
+                    <option value="ALL">All Departments</option>
+                    <option th:each="dept : ${departments}" th:value="${dept.departmentId}" th:text="${dept.departmentName}"></option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <input type="text" id="searchInput" class="form-control" placeholder="Search by name or staff code...">
+            </div>
+        </div>
+
+        <!-- Staff Table -->
+        <div class="table-card">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                    <tr>
+                        <th>Staff Code</th>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Department</th>
+                        <th>Branch</th>
+                        <th>Role</th>
+                        <th>Actions</th>
+                    </tr>
+                    </thead>
+                    <tbody id="staffTableBody">
+                    <tr th:each="staff : ${staffList}">
+                        <td th:text="${staff.staffCode}">1000001</td>
+                        <td th:text="${staff.firstName + ' ' + staff.otherName}">Staff Name</td>
+                        <td th:text="${staff.email}">email@example.com</td>
+                        <td th:text="${staff.department != null ? staff.department.departmentName : 'N/A'}">Dept</td>
+                        <td th:text="${staff.branch != null ? staff.branch.branchName : 'N/A'}">Branch</td>
+                        <td>
+                            <span class="badge bg-info" th:text="${staff.role}">STAFF</span>
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-primary edit-staff-btn"
+                                    th:data-staff-id="${staff.staffId}"
+                                    th:data-staff-code="${staff.staffCode}"
+                                    th:data-staff-name="${staff.firstName + ' ' + staff.otherName}"
+                                    th:data-dept-id="${staff.department != null ? staff.department.departmentId : ''}"
+                                    th:data-branch-id="${staff.branch != null ? staff.branch.branchId : ''}">
+                                <i class="fas fa-edit"></i> Edit
+                            </button>
+                        </td>
+                    </tr>
+                    <tr th:if="${staffList == null || staffList.isEmpty()}">
+                        <td colspan="7" class="text-center">No staff members found</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Edit Staff Modal -->
+<div class="modal fade" id="editStaffModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header" style="background-color: var(--deep-navy); color: white;">
+                <h5 class="modal-title"><i class="fas fa-user-edit"></i> Edit Staff</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editStaffId">
+                <div class="mb-3">
+                    <label class="fw-bold">Staff Code</label>
+                    <input type="text" id="editStaffCode" class="form-control" readonly>
+                </div>
+                <div class="mb-3">
+                    <label class="fw-bold">Staff Name</label>
+                    <input type="text" id="editStaffName" class="form-control" readonly>
+                </div>
+                <div class="mb-3">
+                    <label class="fw-bold">Department</label>
+                    <select id="editDepartment" class="form-select">
+                        <option th:each="dept : ${departments}" th:value="${dept.departmentId}" th:text="${dept.departmentName}"></option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="fw-bold">Branch</label>
+                    <select id="editBranch" class="form-select">
+                        <option th:each="branch : ${branches}" th:value="${branch.branchId}" th:text="${branch.branchName}"></option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveStaffBtn">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+    $(document).ready(function() {
+        let editModal = new bootstrap.Modal(document.getElementById('editStaffModal'));
+
+        $('#branchFilter, #departmentFilter, #editDepartment, #editBranch').select2({
+            placeholder: 'Select...',
+            allowClear: true,
+            width: '100%'
+        });
+
+        // Edit Staff
+        $('.edit-staff-btn').click(function() {
+            let staffId = $(this).data('staff-id');
+            let staffCode = $(this).data('staff-code');
+            let staffName = $(this).data('staff-name');
+            let deptId = $(this).data('dept-id');
+            let branchId = $(this).data('branch-id');
+
+            $('#editStaffId').val(staffId);
+            $('#editStaffCode').val(staffCode);
+            $('#editStaffName').val(staffName);
+            $('#editDepartment').val(deptId).trigger('change');
+            $('#editBranch').val(branchId).trigger('change');
+
+            editModal.show();
+        });
+
+        // Save Staff Changes
+        $('#saveStaffBtn').click(function() {
+            let staffId = $('#editStaffId').val();
+            let deptId = $('#editDepartment').val();
+            let branchId = $('#editBranch').val();
+
+            $.ajax({
+                url: `/admin/staff/${staffId}/update`,
+                type: 'POST',
+                data: { branchId: branchId, departmentId: deptId },
+                success: function(response) {
+                    if (response.status === 'success') {
+                        Swal.fire('Updated!', response.message, 'success');
+                        editModal.hide();
+                        setTimeout(() => location.reload(), 1500);
+                    } else {
+                        Swal.fire('Error!', response.message, 'error');
+                    }
+                },
+                error: function() {
+                    Swal.fire('Error!', 'Failed to update staff', 'error');
+                }
+            });
+        });
+
+        // Search
+        $('#searchInput').on('keyup', function() {
+            let searchTerm = $(this).val().toLowerCase();
+            $('#staffTableBody tr').each(function() {
+                let text = $(this).text().toLowerCase();
+                $(this).toggle(text.includes(searchTerm));
+            });
+        });
+    });
+</script>
+</body>
+</html>

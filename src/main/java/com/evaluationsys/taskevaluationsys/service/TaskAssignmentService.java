@@ -7,6 +7,8 @@ import com.evaluationsys.taskevaluationsys.entity.enums.TaskStatus;
 import com.evaluationsys.taskevaluationsys.repository.TaskAssignmentRepository;
 import com.evaluationsys.taskevaluationsys.repository.TaskRepository;
 import com.evaluationsys.taskevaluationsys.repository.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +19,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class TaskAssignmentService {
+
+    private static final Logger log = LoggerFactory.getLogger(TaskAssignmentService.class);
 
     private final TaskAssignmentRepository repository;
     private final TaskRepository taskRepository;
@@ -35,13 +39,11 @@ public class TaskAssignmentService {
     // =========================
     @Transactional
     public TaskAssignmentDTOResponse createAssignment(TaskAssignmentDTO dto) {
-
         if (dto.getTaskId() == null || dto.getStaffId() == null) {
             throw new IllegalArgumentException("Task ID and Staff ID must be provided");
         }
 
         TaskAssignmentId id = new TaskAssignmentId(dto.getStaffId(), dto.getTaskId());
-
         if (repository.existsById(id)) {
             throw new RuntimeException("Assignment already exists for this task and staff member");
         }
@@ -60,7 +62,6 @@ public class TaskAssignmentService {
     // =========================
     @Transactional
     public TaskAssignmentDTOResponse createAssignmentByDescAndCode(String taskDescription, Long staffCode) {
-
         if (taskDescription == null || staffCode == null || taskDescription.isBlank()) {
             throw new IllegalArgumentException("Task description and staff code must be provided");
         }
@@ -113,34 +114,119 @@ public class TaskAssignmentService {
     }
 
     // =========================
-    // STATUS UPDATE
+    // ✅ STAFF UPDATE THEIR OWN ASSIGNMENT STATUS - FIXED
+    // =========================
+    @Transactional
+    public Optional<TaskAssignmentDTOResponse> updateMyAssignmentStatus(Long taskId, Long staffId, TaskStatus newStatus) {
+        Optional<TaskAssignment> optionalAssignment =
+                repository.findByTaskIdAndStaffId(taskId, staffId);
+
+        if (optionalAssignment.isEmpty()) {
+            log.warn("Assignment not found for taskId: {} and staffId: {}", taskId, staffId);
+            return Optional.empty();
+        }
+
+        TaskAssignment assignment = optionalAssignment.get();
+        TaskStatus oldStatus = assignment.getStatus();
+
+        // Validate transition
+        validateStatusTransition(oldStatus, newStatus);
+
+        // ✅ ONLY update this specific assignment - DO NOT update other assignments
+        assignment.setStatus(newStatus);
+        repository.save(assignment);
+
+        log.info("✅ Staff {} updated their assignment {} from {} to {}",
+                staffId, assignment.getTaskAssignCode(), oldStatus, newStatus);
+
+        // ✅ Update task status based on ALL assignments
+        syncTaskStatusFromAssignments(taskId);
+
+        return Optional.of(toResponseDTO(assignment));
+    }
+
+    // =========================
+    // ✅ SYNC TASK STATUS BASED ON ALL ASSIGNMENTS
+    // =========================
+    private void syncTaskStatusFromAssignments(Long taskId) {
+        List<TaskAssignment> assignments = repository.findByTask_TaskId(taskId);
+        if (assignments.isEmpty()) return;
+
+        Task task = assignments.get(0).getTask();
+        TaskStatus currentTaskStatus = task.getTaskStatus();
+
+        // Determine the collective status
+        boolean allAssigned = assignments.stream().allMatch(a -> a.getStatus() == TaskStatus.ASSIGNED);
+        boolean allInitiated = assignments.stream().allMatch(a -> a.getStatus() == TaskStatus.INITIATED);
+        boolean allInProgress = assignments.stream().allMatch(a -> a.getStatus() == TaskStatus.IN_PROGRESS);
+        boolean allCompleted = assignments.stream().allMatch(a -> a.getStatus() == TaskStatus.COMPLETED);
+        boolean allPendingReview = assignments.stream().allMatch(a -> a.getStatus() == TaskStatus.PENDING_REVIEW);
+        boolean allApproved = assignments.stream().allMatch(a -> a.getStatus() == TaskStatus.APPROVED);
+
+        boolean anyRejected = assignments.stream().anyMatch(a -> a.getStatus() == TaskStatus.REJECTED);
+        boolean anyInProgress = assignments.stream().anyMatch(a ->
+                a.getStatus() == TaskStatus.IN_PROGRESS ||
+                        a.getStatus() == TaskStatus.ASSIGNED ||
+                        a.getStatus() == TaskStatus.INITIATED);
+
+        boolean anyPendingReview = assignments.stream().anyMatch(a -> a.getStatus() == TaskStatus.PENDING_REVIEW);
+        boolean anyCompleted = assignments.stream().anyMatch(a -> a.getStatus() == TaskStatus.COMPLETED);
+
+        TaskStatus newTaskStatus = currentTaskStatus;
+
+        if (allApproved) {
+            newTaskStatus = TaskStatus.APPROVED;
+        } else if (allPendingReview) {
+            newTaskStatus = TaskStatus.PENDING_REVIEW;
+        } else if (allCompleted) {
+            newTaskStatus = TaskStatus.COMPLETED;
+        } else if (allInProgress) {
+            newTaskStatus = TaskStatus.IN_PROGRESS;
+        } else if (allInitiated) {
+            newTaskStatus = TaskStatus.INITIATED;
+        } else if (allAssigned) {
+            newTaskStatus = TaskStatus.ASSIGNED;
+        } else if (anyRejected || anyInProgress) {
+            newTaskStatus = TaskStatus.IN_PROGRESS;
+        } else if (anyPendingReview) {
+            newTaskStatus = TaskStatus.PENDING_REVIEW;
+        } else if (anyCompleted) {
+            newTaskStatus = TaskStatus.COMPLETED;
+        }
+
+        if (newTaskStatus != currentTaskStatus) {
+            task.setTaskStatus(newTaskStatus);
+            taskRepository.save(task);
+            log.info("📋 Task {} status synced from {} to {} based on assignments",
+                    taskId, currentTaskStatus, newTaskStatus);
+        }
+    }
+
+    // =========================
+    // STATUS UPDATE (Admin/Manual)
     // =========================
     @Transactional
     public Optional<TaskAssignmentDTOResponse> updateStatus(String code, TaskStatus newStatus) {
         return repository.findByTaskAssignCode(code)
                 .map(assignment -> {
-
                     validateStatusTransition(assignment.getStatus(), newStatus);
-
                     assignment.setStatus(newStatus);
-                    assignment.getTask().setTaskStatus(newStatus);
-
-                    taskRepository.save(assignment.getTask());
                     repository.save(assignment);
+
+                    // ✅ Sync task status from all assignments
+                    syncTaskStatusFromAssignments(assignment.getTask().getTaskId());
 
                     return toResponseDTO(assignment);
                 });
     }
 
     // =========================
-    // FULL UPDATE
+    // FULL UPDATE (Admin)
     // =========================
     @Transactional
     public Optional<TaskAssignmentDTOResponse> updateAssignment(String code, TaskAssignmentDTO dto) {
-
         return repository.findByTaskAssignCode(code)
                 .map(assignment -> {
-
                     if (dto.getTaskId() != null) {
                         Task task = taskRepository.findById(dto.getTaskId())
                                 .orElseThrow(() -> new RuntimeException("Task not found"));
@@ -157,11 +243,13 @@ public class TaskAssignmentService {
                         TaskStatus newStatus = TaskStatus.valueOf(dto.getStatus());
                         validateStatusTransition(assignment.getStatus(), newStatus);
                         assignment.setStatus(newStatus);
-                        assignment.getTask().setTaskStatus(newStatus);
-                        taskRepository.save(assignment.getTask());
                     }
 
                     repository.save(assignment);
+
+                    // ✅ Sync task status from all assignments
+                    syncTaskStatusFromAssignments(assignment.getTask().getTaskId());
+
                     return toResponseDTO(assignment);
                 });
     }
@@ -171,14 +259,20 @@ public class TaskAssignmentService {
     // =========================
     @Transactional
     public void deleteByCode(String code) {
-        repository.deleteByTaskAssignCode(code);
+        Optional<TaskAssignment> assignmentOpt = repository.findByTaskAssignCode(code);
+        if (assignmentOpt.isPresent()) {
+            Long taskId = assignmentOpt.get().getTask().getTaskId();
+            repository.deleteByTaskAssignCode(code);
+
+            // ✅ Sync task status after deletion
+            syncTaskStatusFromAssignments(taskId);
+        }
     }
 
     // =========================
     // SAVE ASSIGNMENT
     // =========================
     private TaskAssignmentDTOResponse saveAssignment(Task task, User user) {
-
         String code = generateTaskAssignCode();
         TaskAssignmentId id = new TaskAssignmentId(user.getStaffId(), task.getTaskId());
 
@@ -190,10 +284,18 @@ public class TaskAssignmentService {
         assignment.setAssignedAt(LocalDateTime.now());
         assignment.setStatus(TaskStatus.ASSIGNED);
 
-        task.setTaskStatus(TaskStatus.ASSIGNED);
+        // ✅ Set task status if null
+        if (task.getTaskStatus() == null) {
+            task.setTaskStatus(TaskStatus.ASSIGNED);
+        }
         taskRepository.save(task);
 
-        return toResponseDTO(repository.save(assignment));
+        TaskAssignment saved = repository.save(assignment);
+
+        // ✅ Sync task status based on all assignments
+        syncTaskStatusFromAssignments(task.getTaskId());
+
+        return toResponseDTO(saved);
     }
 
     // =========================
@@ -212,15 +314,14 @@ public class TaskAssignmentService {
                 } catch (NumberFormatException ignored) {}
             }
         }
-
         return String.format("ASS/%d/%03d", year, seq);
     }
 
     // =========================
-    // DTO MAPPER (FIXED FINAL)
+    // DTO MAPPER
     // =========================
     private TaskAssignmentDTOResponse toResponseDTO(TaskAssignment a) {
-
+        Task task = a.getTask();
         User user = a.getAssignUser();
 
         String departmentName = (user.getDepartment() != null)
@@ -233,13 +334,14 @@ public class TaskAssignmentService {
 
         return new TaskAssignmentDTOResponse(
                 a.getTaskAssignCode(),
-                a.getTask().getTaskId(),
-                a.getTask().getDescription(),
+                task.getTaskId(),
+                task.getDescription(),
+                task.getDeadline(),
                 user.getStaffId(),
                 user.getFirstName(),
                 user.getOtherName(),
-                branchName,
                 departmentName,
+                branchName,
                 a.getAssignedAt(),
                 a.getStatus() != null ? a.getStatus().name() : null
         );
@@ -249,7 +351,6 @@ public class TaskAssignmentService {
     // VALIDATION
     // =========================
     private void validateStatusTransition(TaskStatus current, TaskStatus next) {
-
         if (current == null || next == null || current == next) return;
 
         boolean valid = switch (current) {
@@ -257,7 +358,11 @@ public class TaskAssignmentService {
             case INITIATED -> next == TaskStatus.IN_PROGRESS;
             case IN_PROGRESS -> next == TaskStatus.COMPLETED;
             case COMPLETED -> next == TaskStatus.PENDING_REVIEW;
-            case PENDING_REVIEW -> next == TaskStatus.APPROVED || next == TaskStatus.REJECTED;
+            case PENDING_REVIEW -> next == TaskStatus.APPROVED ||
+                    next == TaskStatus.REJECTED ||
+                    next == TaskStatus.PENDING_APPROVAL;
+            case REJECTED -> next == TaskStatus.IN_PROGRESS;
+            case PENDING_APPROVAL -> next == TaskStatus.APPROVED || next == TaskStatus.REJECTED;
             default -> false;
         };
 

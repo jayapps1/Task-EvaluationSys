@@ -3,10 +3,12 @@ package com.evaluationsys.taskevaluationsys.service;
 import com.evaluationsys.taskevaluationsys.dto.TaskDTO;
 import com.evaluationsys.taskevaluationsys.dtoresponse.TaskDTOResponse;
 import com.evaluationsys.taskevaluationsys.entity.Task;
+import com.evaluationsys.taskevaluationsys.entity.TaskAssignment;
 import com.evaluationsys.taskevaluationsys.entity.User;
 import com.evaluationsys.taskevaluationsys.entity.enums.Quarter;
 import com.evaluationsys.taskevaluationsys.entity.enums.TaskStatus;
 import com.evaluationsys.taskevaluationsys.repository.SupervisorRepository;
+import com.evaluationsys.taskevaluationsys.repository.TaskAssignmentRepository;
 import com.evaluationsys.taskevaluationsys.repository.TaskRepository;
 import com.evaluationsys.taskevaluationsys.repository.UserRepository;
 import org.springframework.data.domain.Page;
@@ -25,13 +27,16 @@ public class TaskService {
     private final TaskRepository taskRepository;
     private final SupervisorRepository supervisorRepository;
     private final UserRepository userRepository;
+    private final TaskAssignmentRepository assignmentRepository;  // ✅ ADD THIS
 
     public TaskService(TaskRepository taskRepository,
                        SupervisorRepository supervisorRepository,
-                       UserRepository userRepository) {
+                       UserRepository userRepository,
+                       TaskAssignmentRepository assignmentRepository) {  // ✅ ADD THIS
         this.taskRepository = taskRepository;
         this.supervisorRepository = supervisorRepository;
         this.userRepository = userRepository;
+        this.assignmentRepository = assignmentRepository;  // ✅ ADD THIS
     }
 
     // ===============================
@@ -91,6 +96,8 @@ public class TaskService {
     public Optional<TaskDTOResponse> updateTask(Long taskId, TaskDTO dto) {
         return taskRepository.findById(taskId)
                 .map(task -> {
+                    TaskStatus oldStatus = task.getTaskStatus();
+
                     if (dto.getDescription() != null) task.setDescription(dto.getDescription());
                     if (dto.getDeadline() != null) task.setDeadline(dto.getDeadline());
                     if (dto.getQuarter() != null) task.setQuarter(dto.getQuarter());
@@ -99,7 +106,14 @@ public class TaskService {
 
                     handleRelations(dto, task);
 
-                    return convertToResponse(taskRepository.save(task));
+                    Task savedTask = taskRepository.save(task);
+
+                    // ✅ SYNC: If status changed, update all assignments
+                    if (dto.getTaskStatus() != null && !dto.getTaskStatus().equals(oldStatus)) {
+                        syncAssignmentsWithTaskStatus(taskId, dto.getTaskStatus());
+                    }
+
+                    return convertToResponse(savedTask);
                 });
     }
 
@@ -128,13 +142,18 @@ public class TaskService {
     }
 
     // ===============================
-    // WORKFLOW METHODS
+    // WORKFLOW METHODS - FIXED WITH SYNC
     // ===============================
     @Transactional
     public boolean staffAcceptTask(Long taskId, Long staffCode) {
         Task task = getTaskOrThrow(taskId);
         if (task.getTaskStatus() != TaskStatus.ASSIGNED) return false;
         task.setTaskStatus(TaskStatus.INITIATED);
+        taskRepository.save(task);
+
+        // ✅ SYNC: Update all assignments for this task
+        syncAssignmentsWithTaskStatus(taskId, TaskStatus.INITIATED);
+
         return true;
     }
 
@@ -143,6 +162,11 @@ public class TaskService {
         Task task = getTaskOrThrow(taskId);
         if (task.getTaskStatus() != TaskStatus.INITIATED) return false;
         task.setTaskStatus(TaskStatus.IN_PROGRESS);
+        taskRepository.save(task);
+
+        // ✅ SYNC: Update all assignments for this task
+        syncAssignmentsWithTaskStatus(taskId, TaskStatus.IN_PROGRESS);
+
         return true;
     }
 
@@ -151,13 +175,33 @@ public class TaskService {
         Task task = getTaskOrThrow(taskId);
         if (task.getTaskStatus() != TaskStatus.IN_PROGRESS) return false;
         task.setTaskStatus(TaskStatus.COMPLETED);
+        taskRepository.save(task);
+
+        // ✅ SYNC: Update all assignments for this task
+        syncAssignmentsWithTaskStatus(taskId, TaskStatus.COMPLETED);
+
+        return true;
+    }
+
+    @Transactional
+    public boolean staffSubmitForReview(Long taskId, Long staffCode) {
+        Task task = getTaskOrThrow(taskId);
+        if (task.getTaskStatus() != TaskStatus.COMPLETED) return false;
+        task.setTaskStatus(TaskStatus.PENDING_REVIEW);
+        taskRepository.save(task);
+
+        // ✅ SYNC: Update all assignments for this task
+        syncAssignmentsWithTaskStatus(taskId, TaskStatus.PENDING_REVIEW);
+
         return true;
     }
 
     @Transactional
     public boolean supervisorApprove(Long taskId, String supervisorCode) {
         Task task = getTaskOrThrow(taskId);
-        if (task.getTaskStatus() != TaskStatus.COMPLETED) return false;
+        if (task.getTaskStatus() != TaskStatus.COMPLETED && task.getTaskStatus() != TaskStatus.PENDING_REVIEW) {
+            return false;
+        }
 
         if (task.getSupervisor() == null ||
                 !task.getSupervisor().getSupervisorCode().equals(supervisorCode)) {
@@ -165,7 +209,42 @@ public class TaskService {
         }
 
         task.setTaskStatus(TaskStatus.APPROVED);
+        taskRepository.save(task);
+
+        // ✅ SYNC: Update all assignments for this task
+        syncAssignmentsWithTaskStatus(taskId, TaskStatus.APPROVED);
+
         return true;
+    }
+
+    @Transactional
+    public boolean supervisorReject(Long taskId, String supervisorCode, String reason) {
+        Task task = getTaskOrThrow(taskId);
+        if (task.getTaskStatus() != TaskStatus.PENDING_REVIEW) return false;
+
+        if (task.getSupervisor() == null ||
+                !task.getSupervisor().getSupervisorCode().equals(supervisorCode)) {
+            throw new RuntimeException("Supervisor mismatch");
+        }
+
+        task.setTaskStatus(TaskStatus.REJECTED);
+        taskRepository.save(task);
+
+        // ✅ SYNC: Update all assignments for this task
+        syncAssignmentsWithTaskStatus(taskId, TaskStatus.REJECTED);
+
+        return true;
+    }
+
+    // ===============================
+    // ✅ NEW: SYNC ASSIGNMENTS WITH TASK STATUS
+    // ===============================
+    private void syncAssignmentsWithTaskStatus(Long taskId, TaskStatus newStatus) {
+        List<TaskAssignment> assignments = assignmentRepository.findByTask_TaskId(taskId);
+        for (TaskAssignment assignment : assignments) {
+            assignment.setStatus(newStatus);
+            assignmentRepository.save(assignment);
+        }
     }
 
     // ===============================
@@ -186,9 +265,8 @@ public class TaskService {
         handleRelations(dto, task);
     }
 
-    // FIXED: Changed to use supervisorId instead of supervisorCode
     private void handleRelations(TaskDTO dto, Task task) {
-        // Supervisor - Now using ID (Long) instead of code (String)
+        // Supervisor
         if (dto.getSupervisorId() != null) {
             supervisorRepository.findById(dto.getSupervisorId())
                     .ifPresentOrElse(
@@ -201,7 +279,7 @@ public class TaskService {
             task.setSupervisor(null);
         }
 
-        // Created By - Using staff code (Long)
+        // Created By
         if (dto.getCreatedByCode() != null) {
             userRepository.findByStaffCode(dto.getCreatedByCode())
                     .ifPresentOrElse(
@@ -231,9 +309,8 @@ public class TaskService {
         resp.setCreatedAt(task.getCreatedAt());
         resp.setUpdatedAt(task.getUpdatedAt());
 
-        // Supervisor - Return ID as String in supervisorCode field
+        // Supervisor
         if (task.getSupervisor() != null) {
-            // Store the ID as String for frontend to use when sending back
             resp.setSupervisorCode(String.valueOf(task.getSupervisor().getSupervisorId()));
             String fullName = getFullName(task.getSupervisor().getUser());
             resp.setSupervisorName(fullName.isEmpty() ? "N/A" : fullName);
@@ -242,7 +319,7 @@ public class TaskService {
             resp.setSupervisorName("N/A");
         }
 
-        // Created By - Return staff code ID
+        // Created By
         if (task.getCreatedBy() != null) {
             resp.setCreatedByStaffCode(task.getCreatedBy().getStaffCode());
             String fullName = getFullName(task.getCreatedBy());
@@ -255,7 +332,6 @@ public class TaskService {
         return resp;
     }
 
-    // Helper to safely build full name
     private String getFullName(User user) {
         if (user == null) return "";
         String first = user.getFirstName() != null ? user.getFirstName() : "";

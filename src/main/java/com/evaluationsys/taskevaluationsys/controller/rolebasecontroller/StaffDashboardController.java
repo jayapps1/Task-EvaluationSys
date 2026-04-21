@@ -1,6 +1,6 @@
 package com.evaluationsys.taskevaluationsys.controller.rolebasecontroller;
 
-import com.evaluationsys.taskevaluationsys.dtoresponse.TaskDTOResponse;
+import com.evaluationsys.taskevaluationsys.dtoresponse.TaskAssignmentDTOResponse;
 import com.evaluationsys.taskevaluationsys.entity.User;
 import com.evaluationsys.taskevaluationsys.entity.Supervisor;
 import com.evaluationsys.taskevaluationsys.entity.enums.TaskStatus;
@@ -48,32 +48,36 @@ public class StaffDashboardController {
 
         User authenticatedUser = userDetails.getUser();
         Long staffCode = authenticatedUser.getStaffCode();
+        Long staffId = authenticatedUser.getStaffId();
 
         System.out.println("=== STAFF DASHBOARD ===");
         System.out.println("Staff Code: " + staffCode);
+        System.out.println("Staff ID: " + staffId);
 
         session.setAttribute("staffCode", staffCode);
+        session.setAttribute("staffId", staffId);
         session.setAttribute("staffName",
                 authenticatedUser.getFirstName() + " " + authenticatedUser.getOtherName());
 
         model.addAttribute("staff", authenticatedUser);
         model.addAttribute("staffCode", staffCode);
+        model.addAttribute("staffId", staffId);  // ✅ ADD staffId for API calls
 
         // =========================
-        // TASKS
+        // ✅ USE ASSIGNMENTS INSTEAD OF TASKS
         // =========================
-        List<TaskDTOResponse> tasks = staffTaskService.getAssignedTasks(staffCode);
-        model.addAttribute("tasks", tasks);
+        List<TaskAssignmentDTOResponse> assignments = staffTaskService.getStaffAssignments(staffId);
+        model.addAttribute("assignments", assignments);
 
-        StaffTaskStatistics stats = staffTaskService.getTaskStatistics(staffCode);
+        StaffTaskStatistics stats = staffTaskService.getAssignmentStatistics(staffId);
         model.addAttribute("statistics", stats);
 
-        List<TaskDTOResponse> overdueTasks = staffTaskService.getOverdueTasks(staffCode);
-        model.addAttribute("overdueCount", overdueTasks.size());
-        model.addAttribute("overdueTasks", overdueTasks);
+        List<TaskAssignmentDTOResponse> overdueAssignments = staffTaskService.getOverdueAssignments(staffId);
+        model.addAttribute("overdueCount", overdueAssignments.size());
+        model.addAttribute("overdueAssignments", overdueAssignments);
 
         // =========================
-        // 🔥 SUPERVISOR (NEW FIX)
+        // SUPERVISOR
         // =========================
         Optional<Supervisor> supervisorOpt =
                 supervisorService.findDepartmentSupervisor(authenticatedUser);
@@ -84,7 +88,7 @@ public class StaffDashboardController {
             Map<String, String> supervisorData = new HashMap<>();
             supervisorData.put("name",
                     supUser.getFirstName() + " " + supUser.getOtherName());
-            supervisorData.put("phone", supUser.getPhoneNumber());
+            supervisorData.put("phone", supUser.getPhoneNumber() != null ? supUser.getPhoneNumber() : "N/A");
 
             model.addAttribute("supervisor", supervisorData);
         } else {
@@ -98,11 +102,11 @@ public class StaffDashboardController {
     }
 
     // =========================
-    // TASK ACTIONS (UNCHANGED)
+    // ✅ ASSIGNMENT ACTIONS (UPDATED TO USE ASSIGNMENT ID)
     // =========================
-    @PostMapping("/task/{taskId}/accept")
+    @PostMapping("/assignment/{taskId}/accept")
     @ResponseBody
-    public ResponseEntity<Map<String, String>> acceptTask(@PathVariable Long taskId) {
+    public ResponseEntity<Map<String, String>> acceptAssignment(@PathVariable Long taskId) {
 
         CustomUserDetails userDetails = getAuthenticatedUser();
 
@@ -113,17 +117,18 @@ public class StaffDashboardController {
             ));
         }
 
-        Long staffCode = userDetails.getUser().getStaffCode();
-        boolean success = staffTaskService.acceptTask(taskId, staffCode);
+        Long staffId = userDetails.getUser().getStaffId();
+        boolean success = staffTaskService.acceptAssignment(taskId, staffId);
 
         return success
-                ? ResponseEntity.ok(Map.of("status", "success", "message", "Task accepted successfully"))
+                ? ResponseEntity.ok(Map.of("status", "success", "message", "Assignment accepted successfully"))
                 : ResponseEntity.badRequest().body(Map.of("status", "failed",
-                "message", "Task may not be in ASSIGNED status"));
+                "message", "Assignment may not be in ASSIGNED status"));
     }
 
-    @PostMapping("/task/{taskId}/start")
-    public ResponseEntity<Map<String, String>> startTask(@PathVariable Long taskId) {
+    @PostMapping("/assignment/{taskId}/start")
+    @ResponseBody
+    public ResponseEntity<Map<String, String>> startAssignment(@PathVariable Long taskId) {
 
         CustomUserDetails userDetails = getAuthenticatedUser();
 
@@ -134,17 +139,18 @@ public class StaffDashboardController {
             ));
         }
 
-        Long staffCode = userDetails.getUser().getStaffCode();
-        boolean success = staffTaskService.startTask(taskId, staffCode);
+        Long staffId = userDetails.getUser().getStaffId();
+        boolean success = staffTaskService.startAssignment(taskId, staffId);
 
         return success
-                ? ResponseEntity.ok(Map.of("status", "success", "message", "Task started"))
+                ? ResponseEntity.ok(Map.of("status", "success", "message", "Assignment started"))
                 : ResponseEntity.badRequest().body(Map.of("status", "failed",
-                "message", "Task not in INITIATED status"));
+                "message", "Assignment not in INITIATED status"));
     }
 
-    @PostMapping("/task/{taskId}/complete")
-    public ResponseEntity<Map<String, String>> completeTask(@PathVariable Long taskId) {
+    @PostMapping("/assignment/{taskId}/complete")
+    @ResponseBody
+    public ResponseEntity<Map<String, String>> completeAssignment(@PathVariable Long taskId) {
 
         CustomUserDetails userDetails = getAuthenticatedUser();
 
@@ -155,20 +161,21 @@ public class StaffDashboardController {
             ));
         }
 
-        Long staffCode = userDetails.getUser().getStaffCode();
-        boolean success = staffTaskService.completeTask(taskId, staffCode);
+        Long staffId = userDetails.getUser().getStaffId();
+        boolean success = staffTaskService.completeAssignment(taskId, staffId);
 
         return success
-                ? ResponseEntity.ok(Map.of("status", "success", "message", "Task completed"))
+                ? ResponseEntity.ok(Map.of("status", "success", "message", "Assignment submitted for review"))
                 : ResponseEntity.badRequest().body(Map.of("status", "failed",
-                "message", "Task not in IN_PROGRESS"));
+                "message", "Assignment not in IN_PROGRESS status"));
     }
 
     // =========================
     // STATUS FILTER
     // =========================
-    @GetMapping("/tasks/status/{status}")
-    public ResponseEntity<List<TaskDTOResponse>> getTasksByStatus(@PathVariable TaskStatus status) {
+    @GetMapping("/assignments/status/{status}")
+    @ResponseBody
+    public ResponseEntity<List<TaskAssignmentDTOResponse>> getAssignmentsByStatus(@PathVariable TaskStatus status) {
 
         CustomUserDetails userDetails = getAuthenticatedUser();
 
@@ -176,8 +183,8 @@ public class StaffDashboardController {
             return ResponseEntity.status(401).build();
         }
 
-        Long staffCode = userDetails.getUser().getStaffCode();
-        return ResponseEntity.ok(staffTaskService.getTasksByStatus(staffCode, status));
+        Long staffId = userDetails.getUser().getStaffId();
+        return ResponseEntity.ok(staffTaskService.getAssignmentsByStatus(staffId, status));
     }
 
     // =========================
