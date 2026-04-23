@@ -20,26 +20,14 @@ public interface TaskAssignmentRepository extends JpaRepository<TaskAssignment, 
     // FIND BY COMPOSITE ID
     // =========================
 
-    /**
-     * Find by taskId and staffId directly
-     */
     @Query("SELECT t FROM TaskAssignment t WHERE t.task.taskId = :taskId AND t.assignUser.staffId = :staffId")
     Optional<TaskAssignment> findByTaskIdAndStaffId(@Param("taskId") Long taskId, @Param("staffId") Long staffId);
 
-    /**
-     * Find by taskAssignCode (unique identifier)
-     */
     Optional<TaskAssignment> findByTaskAssignCode(String taskAssignCode);
 
-    /**
-     * Check if assignment exists by taskId and staffId
-     */
     @Query("SELECT CASE WHEN COUNT(t) > 0 THEN true ELSE false END FROM TaskAssignment t WHERE t.task.taskId = :taskId AND t.assignUser.staffId = :staffId")
     boolean existsByTaskIdAndStaffId(@Param("taskId") Long taskId, @Param("staffId") Long staffId);
 
-    /**
-     * Delete by taskId and staffId
-     */
     @Transactional
     @Modifying
     @Query("DELETE FROM TaskAssignment t WHERE t.task.taskId = :taskId AND t.assignUser.staffId = :staffId")
@@ -59,7 +47,7 @@ public interface TaskAssignmentRepository extends JpaRepository<TaskAssignment, 
     Optional<TaskAssignment> findByTask_DescriptionAndAssignUser_StaffId(String description, Long staffId);
 
     // =========================
-    // QUERIES BY TASK STATUS (ENUM)
+    // QUERIES BY TASK STATUS
     // =========================
 
     List<TaskAssignment> findByStatus(TaskStatus status);
@@ -76,9 +64,6 @@ public interface TaskAssignmentRepository extends JpaRepository<TaskAssignment, 
     @Query("SELECT t FROM TaskAssignment t WHERE t.task.taskId = :taskId")
     List<TaskAssignment> findAllByTaskId(@Param("taskId") Long taskId);
 
-    /**
-     * Find all assignments for a task with specific status
-     */
     @Query("SELECT t FROM TaskAssignment t WHERE t.task.taskId = :taskId AND t.status = :status")
     List<TaskAssignment> findByTaskIdAndStatus(@Param("taskId") Long taskId, @Param("status") TaskStatus status);
 
@@ -88,23 +73,17 @@ public interface TaskAssignmentRepository extends JpaRepository<TaskAssignment, 
 
     List<TaskAssignment> findByAssignUser_StaffId(Long staffId);
 
-    // ✅ ADDED: Find by StaffCode
     List<TaskAssignment> findByAssignUser_StaffCode(Long staffCode);
 
-    // ✅ ADDED: Find by StaffCode with JPQL
     @Query("SELECT t FROM TaskAssignment t WHERE t.assignUser.staffCode = :staffCode")
     List<TaskAssignment> findAllByStaffCode(@Param("staffCode") Long staffCode);
 
     @Query("SELECT t FROM TaskAssignment t WHERE t.assignUser.staffId = :staffId")
     List<TaskAssignment> findAllByStaffId(@Param("staffId") Long staffId);
 
-    /**
-     * Find all assignments for a staff member with specific status
-     */
     @Query("SELECT t FROM TaskAssignment t WHERE t.assignUser.staffId = :staffId AND t.status = :status")
     List<TaskAssignment> findByStaffIdAndStatus(@Param("staffId") Long staffId, @Param("status") TaskStatus status);
 
-    // ✅ ADDED: Find by StaffCode and Status
     @Query("SELECT t FROM TaskAssignment t WHERE t.assignUser.staffCode = :staffCode AND t.status = :status")
     List<TaskAssignment> findByStaffCodeAndStatus(@Param("staffCode") Long staffCode, @Param("status") TaskStatus status);
 
@@ -130,7 +109,6 @@ public interface TaskAssignmentRepository extends JpaRepository<TaskAssignment, 
     @Query("SELECT COUNT(t) FROM TaskAssignment t WHERE t.assignUser.staffId = :staffId")
     long countByStaffId(@Param("staffId") Long staffId);
 
-    // ✅ ADDED: Count by StaffCode
     @Query("SELECT COUNT(t) FROM TaskAssignment t WHERE t.assignUser.staffCode = :staffCode")
     long countByStaffCode(@Param("staffCode") Long staffCode);
 
@@ -140,7 +118,6 @@ public interface TaskAssignmentRepository extends JpaRepository<TaskAssignment, 
 
     boolean existsByTask_TaskIdAndAssignUser_StaffId(Long taskId, Long staffId);
 
-    // ✅ ADDED: Exists by StaffCode
     boolean existsByTask_TaskIdAndAssignUser_StaffCode(Long taskId, Long staffCode);
 
     @Query("SELECT CASE WHEN COUNT(t) > 0 THEN true ELSE false END FROM TaskAssignment t WHERE t.task.taskId = :taskId AND t.assignUser.staffId = :staffId")
@@ -165,7 +142,6 @@ public interface TaskAssignmentRepository extends JpaRepository<TaskAssignment, 
     @Query("UPDATE TaskAssignment t SET t.status = :newStatus WHERE t.task.taskId = :taskId AND t.assignUser.staffId = :staffId")
     int updateStatusByTaskIdAndStaffId(@Param("taskId") Long taskId, @Param("staffId") Long staffId, @Param("newStatus") TaskStatus newStatus);
 
-    // ✅ ADDED: Update by StaffCode
     @Transactional
     @Modifying
     @Query("UPDATE TaskAssignment t SET t.status = :newStatus WHERE t.task.taskId = :taskId AND t.assignUser.staffCode = :staffCode")
@@ -176,7 +152,6 @@ public interface TaskAssignmentRepository extends JpaRepository<TaskAssignment, 
     @Query("UPDATE TaskAssignment t SET t.status = :newStatus WHERE t.assignUser.staffId = :staffId")
     int updateStatusByStaffId(@Param("staffId") Long staffId, @Param("newStatus") TaskStatus newStatus);
 
-    // ✅ ADDED: Update by StaffCode
     @Transactional
     @Modifying
     @Query("UPDATE TaskAssignment t SET t.status = :newStatus WHERE t.assignUser.staffCode = :staffCode")
@@ -194,7 +169,6 @@ public interface TaskAssignmentRepository extends JpaRepository<TaskAssignment, 
     @Modifying
     void deleteByAssignUser_StaffId(Long staffId);
 
-    // ✅ ADDED: Delete by StaffCode
     @Transactional
     @Modifying
     void deleteByAssignUser_StaffCode(Long staffCode);
@@ -228,7 +202,6 @@ public interface TaskAssignmentRepository extends JpaRepository<TaskAssignment, 
     @Query("SELECT t.assignUser.staffId, COUNT(t) FROM TaskAssignment t GROUP BY t.assignUser.staffId")
     List<Object[]> countGroupByStaffId();
 
-    // ✅ ADDED: Group by StaffCode
     @Query("SELECT t.assignUser.staffCode, COUNT(t) FROM TaskAssignment t GROUP BY t.assignUser.staffCode")
     List<Object[]> countGroupByStaffCode();
 
@@ -248,7 +221,6 @@ public interface TaskAssignmentRepository extends JpaRepository<TaskAssignment, 
     @Query("SELECT DISTINCT t.assignUser.staffId FROM TaskAssignment t")
     List<Long> findDistinctStaffIds();
 
-    // ✅ ADDED: Distinct StaffCodes
     @Query("SELECT DISTINCT t.assignUser.staffCode FROM TaskAssignment t")
     List<Long> findDistinctStaffCodes();
 
@@ -276,7 +248,7 @@ public interface TaskAssignmentRepository extends JpaRepository<TaskAssignment, 
     Optional<TaskAssignment> findPendingReviewByTaskIdAndStaffId(@Param("taskId") Long taskId, @Param("staffId") Long staffId);
 
     // =========================
-    // ACTIVE ASSIGNMENTS (Not yet completed or approved)
+    // ACTIVE ASSIGNMENTS
     // =========================
 
     @Query("SELECT t FROM TaskAssignment t WHERE t.status NOT IN ('APPROVED', 'REJECTED')")
@@ -292,30 +264,26 @@ public interface TaskAssignmentRepository extends JpaRepository<TaskAssignment, 
     @Query("SELECT t FROM TaskAssignment t WHERE t.assignUser.staffId = :staffId AND t.status NOT IN ('APPROVED', 'REJECTED')")
     List<TaskAssignment> findActiveAssignmentsByStaffId(@Param("staffId") Long staffId);
 
-    // ✅ ADDED: Active assignments by StaffCode
     @Query("SELECT t FROM TaskAssignment t WHERE t.assignUser.staffCode = :staffCode AND t.status NOT IN ('APPROVED', 'REJECTED')")
     List<TaskAssignment> findActiveAssignmentsByStaffCode(@Param("staffCode") Long staffCode);
 
     @Query("SELECT t FROM TaskAssignment t WHERE t.assignUser.staffId = :staffId AND t.status IN ('ASSIGNED', 'INITIATED', 'IN_PROGRESS')")
     List<TaskAssignment> findCurrentTasksByStaffId(@Param("staffId") Long staffId);
 
-    // ✅ ADDED: Current tasks by StaffCode
     @Query("SELECT t FROM TaskAssignment t WHERE t.assignUser.staffCode = :staffCode AND t.status IN ('ASSIGNED', 'INITIATED', 'IN_PROGRESS')")
     List<TaskAssignment> findCurrentTasksByStaffCode(@Param("staffCode") Long staffCode);
 
     // =========================
-// BASIC QUERIES - ADD THESE
-// =========================
+    // ADDITIONAL BASIC QUERIES
+    // =========================
 
-    // ✅ ADDED: Find by task description and staff code
     Optional<TaskAssignment> findByTask_DescriptionAndAssignUser_StaffCode(String description, Long staffCode);
 
-    // ✅ ADDED: Find by task description and staff code with JPQL
     @Query("SELECT t FROM TaskAssignment t WHERE t.task.description = :description AND t.assignUser.staffCode = :staffCode")
     Optional<TaskAssignment> findByDescriptionAndStaffCode(@Param("description") String description, @Param("staffCode") Long staffCode);
 
     // =========================
-    // DEPARTMENT QUERIES (for supervisor)
+    // DEPARTMENT QUERIES
     // =========================
 
     @Query("SELECT t FROM TaskAssignment t WHERE t.assignUser.department.departmentId = :departmentId")
@@ -323,4 +291,21 @@ public interface TaskAssignmentRepository extends JpaRepository<TaskAssignment, 
 
     @Query("SELECT t FROM TaskAssignment t WHERE t.assignUser.department.departmentId = :departmentId AND t.status = :status")
     List<TaskAssignment> findByDepartmentIdAndStatus(@Param("departmentId") Long departmentId, @Param("status") TaskStatus status);
+
+    // =========================
+    // CRITICAL METHODS FOR STAFF EVALUATION - ADD THESE
+    // =========================
+
+    // Find by staffId (assignUser.staffId) - ALIAS for findByAssignUser_StaffId
+    default List<TaskAssignment> findByStaffId(Long staffId) {
+        return findByAssignUser_StaffId(staffId);
+    }
+
+    // Find by staffId and task taskId
+    @Query("SELECT t FROM TaskAssignment t WHERE t.assignUser.staffId = :staffId AND t.task.taskId = :taskId")
+    Optional<TaskAssignment> findByStaffIdAndTask_TaskId(@Param("staffId") Long staffId, @Param("taskId") Long taskId);
+
+    // Find by task taskId (returns all assignments for a task)
+    @Query("SELECT t FROM TaskAssignment t WHERE t.task.taskId = :taskId")
+    List<TaskAssignment> findByTask_TaskIdList(@Param("taskId") Long taskId);
 }

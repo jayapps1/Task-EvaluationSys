@@ -2,7 +2,7 @@
   <div class="container">
 
     <!-- Brand -->
-    <a class="navbar-brand" th:href="@{/index}">
+    <a class="navbar-brand" th:href="@{/}">
       <i class="fa-solid fa-rocket me-2"></i> TES
     </a>
 
@@ -17,8 +17,21 @@
 
       <!-- LEFT -->
       <ul class="navbar-nav mb-2 mb-lg-0">
-        <li class="nav-item">
-          <a class="nav-link" th:href="@{/layout/admin/index}">Home</a>
+        <!-- ✅ Home - Role Based -->
+        <li class="nav-item" th:if="${#authorization.expression('hasRole(''ADMIN'')')}">
+          <a class="nav-link" th:href="@{/admin/dashboard}">
+            <i class="fas fa-home"></i> Home
+          </a>
+        </li>
+        <li class="nav-item" th:if="${#authorization.expression('hasRole(''SUPERVISOR'')')}">
+          <a class="nav-link" th:href="@{/supervisor/dashboard}">
+            <i class="fas fa-home"></i> Home
+          </a>
+        </li>
+        <li class="nav-item" th:if="${#authorization.expression('hasRole(''STAFF'')')}">
+          <a class="nav-link" th:href="@{/staff/dashboard}">
+            <i class="fas fa-home"></i> Home
+          </a>
         </li>
 
         <!-- Dashboard Menu Trigger (All authenticated users) -->
@@ -28,25 +41,29 @@
           </a>
         </li>
 
-        <!-- Admin Dashboard Link -->
-        <li class="nav-item" th:if="${#authorization.expression('hasRole(''ADMIN'')')}">
-          <a class="nav-link" th:href="@{/admin/dashboard}">
-            <i class="fas fa-tachometer-alt"></i> Dashboard
+        <!-- ✅ Evaluation Dropdown (Admin only) -->
+        <li class="nav-item dropdown" th:if="${#authorization.expression('hasRole(''ADMIN'')')}">
+          <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
+            <i class="fas fa-star"></i> Evaluation
           </a>
-        </li>
-
-        <!-- Supervisor Dashboard Link -->
-        <li class="nav-item" th:if="${#authorization.expression('hasRole(''SUPERVISOR'')')}">
-          <a class="nav-link" th:href="@{/supervisor/dashboard}">
-            <i class="fas fa-tachometer-alt"></i> Dashboard
-          </a>
-        </li>
-
-        <!-- Staff Dashboard Link -->
-        <li class="nav-item" th:if="${#authorization.expression('hasRole(''STAFF'')')}">
-          <a class="nav-link" th:href="@{/staff/dashboard}">
-            <i class="fas fa-tachometer-alt"></i> Dashboard
-          </a>
+          <ul class="dropdown-menu">
+            <li>
+              <a class="dropdown-item" th:href="@{/dashboard/evaluations}">
+                <i class="fas fa-tasks"></i> Task Evaluations
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item" th:href="@{/admin/staff-evaluations}">
+                <i class="fas fa-users"></i> Staff Performance Evaluation
+              </a>
+            </li>
+            <li><hr class="dropdown-divider"></li>
+            <li>
+              <a class="dropdown-item" th:href="@{/admin/evaluations}">
+                <i class="fas fa-chart-line"></i> Evaluation Dashboard
+              </a>
+            </li>
+          </ul>
         </li>
 
         <!-- Reports Dropdown - Role Based -->
@@ -86,6 +103,12 @@
             <li th:if="${#authorization.expression('hasAnyRole(''ADMIN'', ''SUPERVISOR'')')}">
               <a class="dropdown-item" th:href="@{/reports/completion}">
                 <i class="fas fa-check-circle"></i> Completion Report
+              </a>
+            </li>
+            <!-- Staff Performance Report (Admin only) -->
+            <li th:if="${#authorization.expression('hasRole(''ADMIN'')')}">
+              <a class="dropdown-item" th:href="@{/admin/staff-evaluations}">
+                <i class="fas fa-user-graduate"></i> Staff Performance Report
               </a>
             </li>
             <!-- Export Data (Admin only) -->

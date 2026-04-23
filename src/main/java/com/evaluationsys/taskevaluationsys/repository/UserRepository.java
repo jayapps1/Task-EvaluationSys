@@ -18,27 +18,30 @@ public interface UserRepository extends JpaRepository<User, Long> {
     // PRIMARY IDENTIFIERS
     // =========================
 
-    Optional<User> findByStaffCode(Long staffCode);  // legacy
-    Optional<User> findByStaffId(Long staffId);      // new
+    Optional<User> findByStaffCode(Long staffCode);
+    Optional<User> findByStaffId(Long staffId);
 
-    boolean existsByStaffCode(Long staffCode);       // legacy
-    boolean existsByStaffId(Long staffId);           // new
+    // Find by email
+    Optional<User> findByEmail(String email);
+
+    boolean existsByStaffCode(Long staffCode);
+    boolean existsByStaffId(Long staffId);
     boolean existsByEmail(String email);
+
+    // Find by staff code OR email (for password reset)
+    @Query("SELECT u FROM User u WHERE CAST(u.staffCode AS string) = :query OR u.email = :query")
+    Optional<User> findByStaffCodeOrEmail(@Param("query") String query);
 
     // =========================
     // ROLE-BASED FETCHING
     // =========================
 
     List<User> findByRole(Role role);
-
-    // ✅ ADDED: Count by role
     long countByRole(Role role);
 
-    // ✅ ADDED: Find all by role with JPQL
     @Query("SELECT u FROM User u WHERE u.role = :role")
     List<User> findAllByRole(@Param("role") Role role);
 
-    // ✅ ADDED: Count all by role with JPQL
     @Query("SELECT COUNT(u) FROM User u WHERE u.role = :role")
     long countAllByRole(@Param("role") Role role);
 
@@ -52,7 +55,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
             String firstName, String otherName
     );
 
-    // ✅ ADDED: Search by name or email
     @Query("SELECT u FROM User u WHERE LOWER(u.firstName) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
             "LOWER(u.otherName) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
             "LOWER(u.email) LIKE LOWER(CONCAT('%', :query, '%'))")
@@ -67,7 +69,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     int updateRoleByStaffCode(@Param("staffCode") Long staffCode, @Param("role") Role role);
 
     // =========================
-    // DEPARTMENT & BRANCH FILTERING
+    // DEPARTMENT & BRANCH FILTERING - FIXED WITH CORRECT FIELD NAMES
     // =========================
 
     @Query("SELECT u FROM User u WHERE u.department.departmentId = :departmentId AND u.role = :role")
@@ -78,25 +80,38 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findByBranchIdAndRole(@Param("branchId") Long branchId,
                                      @Param("role") Role role);
 
-    // ✅ ADDED: Find staff by department only
     @Query("SELECT u FROM User u WHERE u.department.departmentId = :deptId AND u.role = 'STAFF'")
     List<User> findStaffByDepartmentId(@Param("deptId") Long deptId);
 
-    // ✅ ADDED: Find staff by branch only
     @Query("SELECT u FROM User u WHERE u.branch.branchId = :branchId AND u.role = 'STAFF'")
     List<User> findStaffByBranchId(@Param("branchId") Long branchId);
 
-    // ✅ ADDED: Find all staff with optional filters
     @Query("SELECT u FROM User u WHERE u.role = 'STAFF'")
     List<User> findAllStaff();
 
-    // ✅ ADDED: Find all supervisors
     @Query("SELECT u FROM User u WHERE u.role = 'SUPERVISOR'")
     List<User> findAllSupervisors();
 
-    // ✅ ADDED: Find all admins
     @Query("SELECT u FROM User u WHERE u.role = 'ADMIN'")
     List<User> findAllAdmins();
+
+    // =========================
+    // FILTER BY ROLE, BRANCH, AND DEPARTMENT - FIXED METHODS
+    // =========================
+
+    // Find by role and branch (using branch.branchId)
+    @Query("SELECT u FROM User u WHERE u.role = :role AND u.branch.branchId = :branchId")
+    List<User> findByRoleAndBranchId(@Param("role") Role role, @Param("branchId") Long branchId);
+
+    // Find by role and department (using department.departmentId)
+    @Query("SELECT u FROM User u WHERE u.role = :role AND u.department.departmentId = :departmentId")
+    List<User> findByRoleAndDepartmentId(@Param("role") Role role, @Param("departmentId") Long departmentId);
+
+    // Find by role, branch, and department
+    @Query("SELECT u FROM User u WHERE u.role = :role AND u.branch.branchId = :branchId AND u.department.departmentId = :departmentId")
+    List<User> findByRoleAndBranchIdAndDepartmentId(@Param("role") Role role,
+                                                    @Param("branchId") Long branchId,
+                                                    @Param("departmentId") Long departmentId);
 
     // =========================
     // STATISTICS

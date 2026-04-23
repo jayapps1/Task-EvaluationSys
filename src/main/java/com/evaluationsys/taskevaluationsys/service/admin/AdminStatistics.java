@@ -12,8 +12,7 @@ public class AdminStatistics {
     private int pendingApprovalTasks; // PENDING_APPROVAL
     private int approvedTasks;       // APPROVED
     private int rejectedTasks;       // REJECTED
-    private int completedTasks;      // COMPLETED ✅ ADDED
-
+    private int completedTasks;      // COMPLETED
     // Getters and Setters
     public long getTotalStaff() { return totalStaff; }
     public void setTotalStaff(long totalStaff) { this.totalStaff = totalStaff; }

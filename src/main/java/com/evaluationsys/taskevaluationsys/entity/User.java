@@ -190,8 +190,18 @@ public class User {
         return createdAt;
     }
 
+    // ✅ ADD THIS SETTER
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
     public LocalDateTime getUpdatedAt() {
         return updatedAt;
+    }
+
+    // ✅ ADD THIS SETTER
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
     }
 
     public LocalDateTime getLastLogIn() {

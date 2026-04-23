@@ -1,0 +1,226 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${pageTitle}">My Profile - TES</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" th:href="@{/css/styles.css}">
+    <link rel="stylesheet" th:href="@{/css/quries.css}">
+
+    <style>
+        :root {
+            --deep-navy: #161E54;
+            --light-blue: #BBE0EF;
+            --white: #FFFFFF;
+            --success-green: #2ECC71;
+        }
+
+        body {
+            background-color: var(--light-blue);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+        }
+
+        .container-custom {
+            padding: 20px;
+            margin-top: 70px;
+        }
+
+        .page-header {
+            background: var(--white);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .profile-card {
+            background: var(--white);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .profile-avatar {
+            width: 120px;
+            height: 120px;
+            background: linear-gradient(135deg, var(--deep-navy), #2a3f8a);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+        }
+
+        .profile-avatar i {
+            font-size: 60px;
+            color: white;
+        }
+
+        .info-label {
+            color: #666;
+            font-size: 13px;
+            margin-bottom: 5px;
+        }
+
+        .info-value {
+            font-size: 18px;
+            font-weight: 500;
+            color: var(--deep-navy);
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .btn-edit {
+            background-color: var(--deep-navy);
+            border: none;
+            color: white;
+            border-radius: 20px;
+            padding: 10px 25px;
+        }
+
+        .btn-edit:hover {
+            background-color: #0f1442;
+            color: white;
+        }
+
+        .btn-change-password {
+            background-color: #F1C40F;
+            border: none;
+            color: #333;
+            border-radius: 20px;
+            padding: 10px 25px;
+        }
+
+        .btn-change-password:hover {
+            background-color: #f39c12;
+            color: #333;
+        }
+
+        .role-badge {
+            background: linear-gradient(135deg, var(--deep-navy), #2a3f8a);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+<div th:replace="~{layout/navbar :: navbar}"></div>
+
+<div class="container-custom">
+    <div class="container">
+
+        <div class="page-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="fas fa-user-circle"></i> My Profile</h2>
+                    <p class="text-muted mb-0">View and manage your account information</p>
+                </div>
+                <div>
+                    <a th:href="@{/profile/edit}" class="btn btn-edit me-2">
+                        <i class="fas fa-edit"></i> Edit Profile
+                    </a>
+                    <a th:href="@{/profile/change-password}" class="btn btn-change-password">
+                        <i class="fas fa-key"></i> Change Password
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-4">
+                <div class="profile-card text-center">
+                    <div class="profile-avatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <h4 th:text="${user.firstName + ' ' + user.otherName}">User Name</h4>
+                    <p class="text-muted" th:text="${user.email}">email@example.com</p>
+                    <span class="role-badge">
+                        <i class="fas fa-shield-alt me-1"></i>
+                        <span th:text="${user.role}">ROLE</span>
+                    </span>
+                </div>
+            </div>
+
+            <div class="col-md-8">
+                <div class="profile-card">
+                    <h5 class="mb-4" style="color: var(--deep-navy);">
+                        <i class="fas fa-info-circle me-2"></i>Account Information
+                    </h5>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="info-label">
+                                <i class="fas fa-id-card me-1"></i> Staff Code
+                            </div>
+                            <div class="info-value" th:text="${user.staffCode}">000000</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-label">
+                                <i class="fas fa-user me-1"></i> Full Name
+                            </div>
+                            <div class="info-value" th:text="${user.firstName + ' ' + user.otherName}">Full Name</div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="info-label">
+                                <i class="fas fa-envelope me-1"></i> Email Address
+                            </div>
+                            <div class="info-value" th:text="${user.email}">email@example.com</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-label">
+                                <i class="fas fa-phone me-1"></i> Phone Number
+                            </div>
+                            <div class="info-value" th:text="${user.phoneNumber ?: 'Not provided'}">Phone</div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="info-label">
+                                <i class="fas fa-building me-1"></i> Department
+                            </div>
+                            <div class="info-value" th:text="${user.department?.departmentName ?: 'Not assigned'}">Department</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-label">
+                                <i class="fas fa-code-branch me-1"></i> Branch
+                            </div>
+                            <div class="info-value" th:text="${user.branch?.branchName ?: 'Not assigned'}">Branch</div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="info-label">
+                                <i class="fas fa-calendar me-1"></i> Account Created
+                            </div>
+                            <div class="info-value" th:text="${user.createdAt != null ? #temporals.format(user.createdAt, 'dd MMM yyyy') : 'N/A'}">Date</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-label">
+                                <i class="fas fa-clock me-1"></i> Last Login
+                            </div>
+                            <div class="info-value" th:text="${user.lastLogIn != null ? #temporals.format(user.lastLogIn, 'dd MMM yyyy HH:mm') : 'N/A'}">Last Login</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

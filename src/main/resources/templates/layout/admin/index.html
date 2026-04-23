@@ -143,6 +143,14 @@
             border-radius: 4px;
             transition: width 0.3s ease;
         }
+
+        .description-truncate {
+            max-width: 200px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: inline-block;
+        }
     </style>
 </head>
 
@@ -292,10 +300,12 @@
             </div>
         </div>
 
-        <!-- Task Status Breakdown -->
+        <!-- ✅ Task Status Breakdown - MATCHES YOUR AdminStatistics EXACTLY -->
         <div class="row">
-            <div class="col-md-3">
-                <div class="stats-card" style="background: linear-gradient(135deg, var(--vibrant-orange), #ff8c42);" onclick="window.location.href='/dashboard/tasks?status=ASSIGNED'">
+            <!-- Assigned -->
+            <div class="col-md-2">
+                <div class="stats-card" style="background: linear-gradient(135deg, var(--vibrant-orange), #ff8c42);"
+                     onclick="window.location.href='/dashboard/tasks?status=ASSIGNED'">
                     <div class="card-body text-center">
                         <i class="fas fa-inbox fa-2x mb-2"></i>
                         <h3 th:text="${statistics.pendingTasks}">0</h3>
@@ -303,16 +313,42 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="stats-card" style="background: linear-gradient(135deg, var(--soft-orange), #ffb347);" onclick="window.location.href='/dashboard/tasks?status=IN_PROGRESS'">
+            <!-- In Progress (INITIATED + IN_PROGRESS) -->
+            <div class="col-md-2">
+                <div class="stats-card" style="background: linear-gradient(135deg, var(--soft-orange), #ffb347);"
+                     onclick="window.location.href='/dashboard/tasks?status=INITIATED,IN_PROGRESS'">
                     <div class="card-body text-center">
                         <i class="fas fa-spinner fa-2x mb-2"></i>
                         <h3 th:text="${statistics.inProgressTasks}">0</h3>
                         <p class="mb-0">In Progress</p>
+                        <small class="text-white-50">Initiated & Working</small>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <!-- Completed -->
+            <div class="col-md-2">
+                <div class="stats-card" style="background: linear-gradient(135deg, #27ae60, #2ECC71);"
+                     onclick="window.location.href='/dashboard/tasks?status=COMPLETED'">
+                    <div class="card-body text-center">
+                        <i class="fas fa-check-double fa-2x mb-2"></i>
+                        <h3 th:text="${statistics.completedTasks}">0</h3>
+                        <p class="mb-0">Completed</p>
+                    </div>
+                </div>
+            </div>
+            <!-- Pending Review -->
+            <div class="col-md-2">
+                <div class="stats-card" style="background: linear-gradient(135deg, var(--warning-yellow), #f39c12); color: #333;"
+                     onclick="window.location.href='/dashboard/tasks?status=PENDING_REVIEW'">
+                    <div class="card-body text-center">
+                        <i class="fas fa-eye fa-2x mb-2"></i>
+                        <h3 th:text="${statistics.pendingReviewTasks}">0</h3>
+                        <p class="mb-0">Pending Review</p>
+                    </div>
+                </div>
+            </div>
+            <!-- Pending Approval -->
+            <div class="col-md-2">
                 <div class="stats-card pending" onclick="window.location.href='/admin/pending-approvals'">
                     <div class="card-body text-center">
                         <i class="fas fa-clock fa-2x mb-2"></i>
@@ -321,8 +357,10 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="stats-card" style="background: linear-gradient(135deg, var(--error-red), #c0392b);" onclick="window.location.href='/dashboard/tasks?status=REJECTED'">
+            <!-- Rejected -->
+            <div class="col-md-2">
+                <div class="stats-card" style="background: linear-gradient(135deg, var(--error-red), #c0392b);"
+                     onclick="window.location.href='/dashboard/tasks?status=REJECTED'">
                     <div class="card-body text-center">
                         <i class="fas fa-times-circle fa-2x mb-2"></i>
                         <h3 th:text="${statistics.rejectedTasks}">0</h3>
@@ -332,7 +370,7 @@
             </div>
         </div>
 
-        <!-- ✅ BRANCH PERFORMANCE - ON TOP -->
+        <!-- Branch Performance -->
         <div class="row">
             <div class="col-12">
                 <div class="table-card">
@@ -376,7 +414,7 @@
             </div>
         </div>
 
-        <!-- ✅ DEPARTMENT PERFORMANCE - BELOW BRANCH WITH BRANCH COLUMN -->
+        <!-- Department Performance -->
         <div class="row">
             <div class="col-12">
                 <div class="table-card">
@@ -385,7 +423,6 @@
                         <table class="table table-hover">
                             <thead>
                             <tr>
-                                <th>Branch</th>
                                 <th>Department</th>
                                 <th>Total Tasks</th>
                                 <th>Completed</th>
@@ -395,7 +432,6 @@
                             </thead>
                             <tbody>
                             <tr th:each="dept : ${departmentPerformance}">
-                                <td th:text="${dept.branchName}">Accra</td>
                                 <td><strong th:text="${dept.departmentName}">ICT</strong></td>
                                 <td th:text="${dept.totalTasks}">0</td>
                                 <td th:text="${dept.completedTasks}">0</td>
@@ -413,7 +449,7 @@
                                 </td>
                             </tr>
                             <tr th:if="${departmentPerformance == null || departmentPerformance.isEmpty()}">
-                                <td colspan="6" class="text-center">No department data available</td>
+                                <td colspan="5" class="text-center">No department data available</td>
                             </tr>
                             </tbody>
                         </table>
@@ -516,13 +552,18 @@
                     <tbody>
                     <tr th:each="assignment : ${recentAssignments}">
                         <td><code th:text="${assignment.taskAssignCode}">ASS/2024/001</code></td>
-                        <td th:text="${assignment.taskDescription}">Task Description</td>
+                        <td>
+                            <span class="description-truncate" th:title="${assignment.taskDescription}"
+                                  th:text="${#strings.length(assignment.taskDescription) > 20 ? #strings.substring(assignment.taskDescription, 0, 20) + '...' : assignment.taskDescription}">
+                                Task Description
+                            </span>
+                        </td>
                         <td th:text="${assignment.staffFullName}">Staff Name</td>
                         <td th:text="${assignment.staffDepartment}">Department</td>
                         <td th:text="${assignment.staffBranch}">Branch</td>
                         <td>
-                                <span class="status-badge" th:classappend="'status-' + ${assignment.status}"
-                                      th:text="${assignment.statusDisplayName}">Status</span>
+                            <span class="status-badge" th:classappend="'status-' + ${assignment.status}"
+                                  th:text="${assignment.statusDisplayName}">Status</span>
                         </td>
                         <td th:text="${#temporals.format(assignment.assignedAt, 'yyyy-MM-dd')}">2024-01-01</td>
                     </tr>
@@ -543,7 +584,6 @@
 
 <script>
     $(document).ready(function() {
-        // Initialize Select2
         $('#branchFilter, #departmentFilter, #quarterFilter').select2({
             placeholder: 'Select...',
             allowClear: true,
@@ -573,8 +613,6 @@
                     scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
                 }
             });
-        } else {
-            $('#staffDeptChart').parent().html('<p class="text-center text-muted p-5">No staff data available</p>');
         }
 
         // Staff by Branch Chart
@@ -600,29 +638,28 @@
                     scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
                 }
             });
-        } else {
-            $('#staffBranchChart').parent().html('<p class="text-center text-muted p-5">No branch data available</p>');
         }
 
-        // Task Status Chart
+        // Task Status Chart - MATCHES YOUR STATISTICS EXACTLY
         const taskStatusCtx = document.getElementById('taskStatusChart').getContext('2d');
         const taskData = [
-            /*[[${statistics.pendingTasks}]]*/ 0,
-            /*[[${statistics.inProgressTasks}]]*/ 0,
-            /*[[${statistics.pendingReviewTasks}]]*/ 0,
-            /*[[${statistics.pendingApprovalTasks}]]*/ 0,
-            /*[[${statistics.approvedTasks}]]*/ 0,
-            /*[[${statistics.rejectedTasks}]]*/ 0
+            /*[[${statistics.pendingTasks}]]*/ 0,        // Assigned
+            /*[[${statistics.inProgressTasks}]]*/ 0,     // In Progress (Initiated + Working)
+            /*[[${statistics.completedTasks}]]*/ 0,      // Completed
+            /*[[${statistics.pendingReviewTasks}]]*/ 0,  // Pending Review
+            /*[[${statistics.pendingApprovalTasks}]]*/ 0, // Pending Approval
+            /*[[${statistics.approvedTasks}]]*/ 0,       // Approved
+            /*[[${statistics.rejectedTasks}]]*/ 0        // Rejected
         ];
 
         if (taskData.some(val => val > 0)) {
             new Chart(taskStatusCtx, {
                 type: 'doughnut',
                 data: {
-                    labels: ['Assigned', 'In Progress', 'Pending Review', 'Pending Approval', 'Approved', 'Rejected'],
+                    labels: ['Assigned', 'In Progress', 'Completed', 'Pending Review', 'Pending Approval', 'Approved', 'Rejected'],
                     datasets: [{
                         data: taskData,
-                        backgroundColor: ['#F16D34', '#161E54', '#F1C40F', '#f39c12', '#2ECC71', '#E76F51']
+                        backgroundColor: ['#F16D34', '#FF986A', '#27ae60', '#F1C40F', '#f39c12', '#2ECC71', '#E76F51']
                     }]
                 },
                 options: {
@@ -632,8 +669,6 @@
                     plugins: { legend: { position: 'right', labels: { boxWidth: 15, padding: 10 } } }
                 }
             });
-        } else {
-            $('#taskStatusChart').parent().html('<p class="text-center text-muted p-5">No task data available</p>');
         }
 
         // Supervisors by Department Chart
@@ -659,8 +694,6 @@
                     scales: { y: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 } } }
                 }
             });
-        } else {
-            $('#supervisorDeptChart').parent().html('<p class="text-center text-muted p-5">No supervisor data available</p>');
         }
 
         // Filter buttons
@@ -668,12 +701,10 @@
             const branch = $('#branchFilter').val();
             const department = $('#departmentFilter').val();
             const quarter = $('#quarterFilter').val();
-
             let url = '/admin/dashboard/filter?';
             if (branch && branch !== 'ALL') url += 'branchId=' + branch + '&';
             if (department && department !== 'ALL') url += 'deptId=' + department + '&';
             if (quarter && quarter !== 'ALL') url += 'quarter=' + quarter;
-
             window.location.href = url;
         });
 

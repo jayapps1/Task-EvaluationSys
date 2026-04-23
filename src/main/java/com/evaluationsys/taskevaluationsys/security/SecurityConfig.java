@@ -42,13 +42,13 @@ public class SecurityConfig {
             var authorities = authentication.getAuthorities();
 
             if (authorities.stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"))) {
-                response.sendRedirect("/admin/dashboard"); // AdminDashboardController
+                response.sendRedirect("/admin/dashboard");
             } else if (authorities.stream().anyMatch(a -> a.getAuthority().equals("ROLE_SUPERVISOR"))) {
-                response.sendRedirect("/supervisor/dashboard"); // SupervisorDashboardController
+                response.sendRedirect("/supervisor/dashboard");
             } else if (authorities.stream().anyMatch(a -> a.getAuthority().equals("ROLE_STAFF"))) {
-                response.sendRedirect("/staff/dashboard"); // StaffDashboardController
+                response.sendRedirect("/staff/dashboard");
             } else {
-                response.sendRedirect("/auth/login?error"); // fallback
+                response.sendRedirect("/auth/login?error");
             }
         };
     }
@@ -60,8 +60,20 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
 
                 .authorizeHttpRequests(auth -> auth
-                        // PUBLIC ONLY LOGIN + STATIC FILES
+                        // ✅ PUBLIC - Login page and static files
                         .requestMatchers("/auth/login", "/css/**", "/js/**", "/images/**").permitAll()
+
+                        // ✅ PUBLIC - Forgot Password Flow
+                        .requestMatchers("/auth/forgot-password").permitAll()
+                        .requestMatchers("/auth/verify-otp").permitAll()
+                        .requestMatchers("/auth/reset-password").permitAll()
+                        .requestMatchers("/auth/password/**").permitAll()
+
+                        // ✅ PUBLIC - Index/Home page
+                        .requestMatchers("/", "/index").permitAll()
+
+                        // ✅ AUTHENTICATED - Profile pages (any logged-in user)
+                        .requestMatchers("/profile/**").authenticated()
 
                         // ✅ ADMIN ONLY
                         .requestMatchers("/auth/register").hasRole("ADMIN")

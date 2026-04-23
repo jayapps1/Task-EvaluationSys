@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff Evaluations - Admin Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        @media print {
+            .sidebar, .btn, .filter-section, .no-print, .actions-column, .card-header .btn {
+                display: none !important;
+            }
+            .col-md-10 {
+                width: 100% !important;
+                margin-left: 0 !important;
+            }
+            .container-fluid {
+                padding: 0 !important;
+            }
+            .card {
+                border: none !important;
+                box-shadow: none !important;
+            }
+            .table {
+                width: 100% !important;
+            }
+            body {
+                padding: 20px !important;
+            }
+        }
+        .modal-body {
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .multi-select-dropdown {
+            position: relative;
+            width: 100%;
+        }
+        .dropdown-toggle-btn {
+            width: 100%;
+            text-align: left;
+            background-color: white;
+            border: 1px solid #ced4da;
+            border-radius: 0.375rem;
+            padding: 0.375rem 0.75rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .dropdown-toggle-btn:hover {
+            background-color: #f8f9fa;
+        }
+        .dropdown-toggle-btn .selected-count {
+            color: #0d6efd;
+            font-weight: bold;
+        }
+        .dropdown-menu-custom {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ced4da;
+            border-radius: 0.375rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1000;
+            max-height: 300px;
+            overflow-y: auto;
+            display: none;
+        }
+        .dropdown-menu-custom.show {
+            display: block;
+        }
+        .dropdown-header {
+            padding: 8px 12px;
+            border-bottom: 1px solid #eee;
+            background-color: #f8f9fa;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+        .dropdown-item-checkbox {
+            padding: 8px 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .dropdown-item-checkbox:hover {
+            background-color: #f8f9fa;
+        }
+        .dropdown-item-checkbox input {
+            margin: 0;
+        }
+        .dropdown-item-checkbox label {
+            margin: 0;
+            cursor: pointer;
+            flex: 1;
+        }
+        .evaluation-card {
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        .evaluation-card:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .task-status-badge-small {
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            margin-left: 8px;
+        }
+    </style>
+</head>
+<body>
+<div class="container-fluid">
+    <div class="row">
+        <!-- Sidebar -->
+        <nav class="col-md-2 d-md-block bg-dark sidebar" style="min-height: 100vh;">
+            <div class="position-sticky pt-3">
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link text-white" href="/admin/dashboard">
+                            <i class="fas fa-tachometer-alt"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link text-white" href="/admin/evaluations">
+                            <i class="fas fa-tasks"></i> Evaluations
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link text-white active" href="/admin/staff-evaluations">
+                            <i class="fas fa-chart-line"></i> Staff Evaluations
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link text-white" href="/admin/pending-approvals">
+                            <i class="fas fa-clock"></i> Pending Approvals
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link text-white" href="/admin/staff">
+                            <i class="fas fa-users"></i> Staff Management
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+
+        <!-- Main content -->
+        <main class="col-md-10 ms-sm-auto px-md-4">
+            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <h1 class="h2">Staff Performance Evaluations</h1>
+                <div class="btn-toolbar mb-2 mb-md-0 no-print">
+                    <div class="btn-group me-2">
+                        <button class="btn btn-success" onclick="window.print()">
+                            <i class="fas fa-print"></i> Print Report
+                        </button>
+                        <button class="btn btn-info" id="exportExcelBtn">
+                            <i class="fas fa-file-excel"></i> Export Excel
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statistics Cards -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card text-white bg-primary">
+                        <div class="card-body">
+                            <h5 class="card-title">Total Staff</h5>
+                            <h2 th:text="${totalStaff}">0</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-white bg-success">
+                        <div class="card-body">
+                            <h5 class="card-title">Average Score</h5>
+                            <h2 th:text="${overallAvgScore + '%'}">0%</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-white bg-info">
+                        <div class="card-body">
+                            <h5 class="card-title">Completion Rate</h5>
+                            <h2 th:text="${overallCompletionRate + '%'}">0%</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-white bg-warning">
+                        <div class="card-body">
+                            <h5 class="card-title">Total Evaluations</h5>
+                            <h2 id="eligibleCount">0</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filter Section with Dependent Dropdowns -->
+            <div class="card mb-4 filter-section">
+                <div class="card-body">
+                    <form method="get" action="/admin/staff-evaluations/filter" class="row g-3" id="filterForm">
+                        <div class="col-md-4">
+                            <label class="form-label">Branch</label>
+                            <select name="branchId" class="form-select" id="branchSelect">
+                                <option value="">All Branches</option>
+                                <option th:each="branch : ${branches}"
+                                        th:value="${branch.branchId}"
+                                        th:text="${branch.branchName}"
+                                        th:selected="${selectedBranch != null && selectedBranch == branch.branchId}">
+                                </option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Department</label>
+                            <select name="deptId" class="form-select" id="deptSelect">
+                                <option value="">All Departments</option>
+                                <option th:each="dept : ${departments}"
+                                        th:value="${dept.departmentId}"
+                                        th:text="${dept.departmentName}"
+                                        th:selected="${selectedDepartment != null && selectedDepartment == dept.departmentId}"
+                                        th:data-branch-id="${dept.branch != null ? dept.branch.branchId : ''}">
+                                </option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary me-2">
+                                <i class="fas fa-filter"></i> Apply Filters
+                            </button>
+                            <a href="/admin/staff-evaluations" class="btn btn-secondary">
+                                <i class="fas fa-redo"></i> Reset
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Staff Evaluation Table -->
+            <div class="card">
+                <div class="card-header">
+                    <h5>Staff Performance Details</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover" id="evaluationTable">
+                            <thead>
+                            <tr>
+                                <th>Staff Name</th>
+                                <th>Branch</th>
+                                <th>Department</th>
+                                <th>Total Tasks</th>
+                                <th>Completed</th>
+                                <th>Pending for Review</th>
+                                <th>Completion Rate</th>
+                                <th>Average Score</th>
+                                <th>Performance Level</th>
+                                <th class="actions-column">Actions</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="eval : ${evaluations}" th:data-staff-id="${eval.staffId}" th:data-total-tasks="${eval.totalTasks}" th:data-completed-tasks="${eval.completedTasks}">
+                                <td th:text="${eval.staffName}"></td>
+                                <td th:text="${eval.branchName}">-</td>
+                                <td th:text="${eval.departmentName}">-</td>
+                                <td th:text="${eval.totalTasks}">0</td>
+                                <td th:text="${eval.completedTasks}">0</td>
+                                <td th:text="${eval.pendingTasks}">0</td>
+                                <td>
+                                    <div class="progress" style="height: 25px;">
+                                        <div class="progress-bar"
+                                             th:style="'width: ' + ${eval.completionRate} + '%;'"
+                                             th:classappend="${eval.completionRate >= 70 ? 'bg-success' : (eval.completionRate >= 50 ? 'bg-warning' : 'bg-danger')}"
+                                             th:text="${eval.completionRate + '%'}">
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span th:classappend="${eval.averageScore >= 70 ? 'badge bg-success' : (eval.averageScore >= 50 ? 'badge bg-warning' : 'badge bg-danger')}"
+                                          class="badge"
+                                          th:text="${eval.averageScore + '%'}">
+                                    </span>
+                                </td>
+                                <td>
+                                    <span th:classappend="${eval.performanceLevel == 'Excellent' ? 'badge bg-success' :
+                                                          (eval.performanceLevel == 'Good' ? 'badge bg-primary' :
+                                                          (eval.performanceLevel == 'Satisfactory' ? 'badge bg-info' :
+                                                          (eval.performanceLevel == 'Needs Improvement' ? 'badge bg-warning' :
+                                                          (eval.performanceLevel == 'Poor' ? 'badge bg-danger' : 'badge bg-secondary'))))}"
+                                          class="badge"
+                                          th:text="${eval.performanceLevel}">
+                                    </span>
+                                </td>
+                                <td class="actions-column">
+                                    <button class="btn btn-sm btn-info view-details-btn mb-1" th:data-staff-id="${eval.staffId}">
+                                        <i class="fas fa-eye"></i> View Tasks
+                                    </button>
+                                    <button class="btn btn-sm btn-primary evaluate-staff-btn mb-1"
+                                            th:data-staff-id="${eval.staffId}"
+                                            th:data-staff-name="${eval.staffName}">
+                                        <i class="fas fa-star"></i> Evaluate
+                                    </button>
+                                    <button class="btn btn-sm btn-warning edit-evaluations-btn mb-1"
+                                            th:data-staff-id="${eval.staffId}"
+                                            th:data-staff-name="${eval.staffName}">
+                                        <i class="fas fa-edit"></i> Edit
+                                    </button>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<!-- View Details Modal - With Recent Evaluations -->
+<div class="modal fade" id="detailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Staff Tasks & Evaluations</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="detailsContent">
+                <!-- Dynamic content -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="printDetails()">
+                    <i class="fas fa-print"></i> Print Details
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Evaluation Modal - With Multi-Select Dropdown -->
+<div class="modal fade" id="createEvaluationModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Evaluate Staff Performance</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="evaluationForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Staff Member</label>
+                        <input type="text" class="form-control" id="staffNameDisplay" readonly>
+                        <input type="hidden" id="staffId" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Select Tasks to Evaluate</label>
+                        <div class="multi-select-dropdown">
+                            <div class="dropdown-toggle-btn" id="dropdownToggle">
+                                <span>Select tasks...</span>
+                                <span class="selected-count">(0 selected)</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </div>
+                            <div class="dropdown-menu-custom" id="tasksDropdownMenu">
+                                <div class="dropdown-header">
+                                    <button type="button" class="btn btn-sm btn-link" id="selectAllTasksBtn">Select All</button>
+                                    <button type="button" class="btn btn-sm btn-link" id="deselectAllTasksBtn">Deselect All</button>
+                                </div>
+                                <div id="tasksCheckboxList">
+                                    <div class="text-center text-muted p-3">Loading tasks...</div>
+                                </div>
+                            </div>
+                        </div>
+                        <small class="text-muted">Select one or more tasks to evaluate this staff member</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Score (0-100)</label>
+                        <input type="number" class="form-control" id="score" min="0" max="100" step="0.01">
+                        <small class="text-muted">Optional - leave empty for remarks-only evaluation</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Remarks <span class="text-danger">*</span></label>
+                        <textarea class="form-control" id="remarks" rows="3" placeholder="Enter evaluation remarks..." required></textarea>
+                        <small class="text-muted">Remarks are required for evaluation</small>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label class="form-label">Year</label>
+                            <input type="number" class="form-control" id="year" th:value="${#dates.year(#dates.createNow())}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Quarter</label>
+                            <select class="form-select" id="quarter">
+                                <option value="1">Q1 (Jan-Mar)</option>
+                                <option value="2">Q2 (Apr-Jun)</option>
+                                <option value="3">Q3 (Jul-Sep)</option>
+                                <option value="4">Q4 (Oct-Dec)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="editModeInfo" class="alert alert-warning mt-3" style="display: none;">
+                        <i class="fas fa-edit"></i> Editing existing evaluation. Changes will update the existing record.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="resetFormBtn">Reset</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="submitBtn">Submit Evaluation</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Evaluations Modal -->
+<div class="modal fade" id="editEvaluationsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Staff Evaluations</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="editEvaluationsContent">
+                <div class="text-center">Loading evaluations...</div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+    let currentDetailsHtml = '';
+    let selectedTasks = [];
+    let isEditMode = false;
+    let currentEvaluationId = null;
+
+    // Store all departments with their branch IDs
+    let allDepartments = [];
+
+    // Initialize departments data from Thymeleaf
+    function initDepartments() {
+        const deptSelect = document.getElementById('deptSelect');
+        const options = deptSelect.querySelectorAll('option');
+        options.forEach(option => {
+            if (option.value) {
+                allDepartments.push({
+                    id: option.value,
+                    name: option.text,
+                    branchId: option.getAttribute('data-branch-id') || ''
+                });
+            }
+        });
+    }
+
+    // Filter departments based on selected branch
+    function filterDepartmentsByBranch() {
+        const branchSelect = document.getElementById('branchSelect');
+        const deptSelect = document.getElementById('deptSelect');
+        const selectedBranchId = branchSelect.value;
+
+        // Clear current options
+        deptSelect.innerHTML = '<option value="">All Departments</option>';
+
+        // Filter and add departments
+        let filteredDepts = allDepartments;
+        if (selectedBranchId) {
+            filteredDepts = allDepartments.filter(dept => dept.branchId === selectedBranchId);
+        }
+
+        // Add filtered departments
+        filteredDepts.forEach(dept => {
+            const option = document.createElement('option');
+            option.value = dept.id;
+            option.textContent = dept.name;
+            // Preselect if this matches the selectedDepartment from server
+            if ('${selectedDepartment != null}' && '${selectedDepartment}' == dept.id) {
+                option.selected = true;
+            }
+            deptSelect.appendChild(option);
+        });
+    }
+
+    function updateEligibleCount() {
+        let total = document.querySelectorAll('.evaluate-staff-btn').length;
+        document.getElementById('eligibleCount').textContent = total;
+    }
+
+    // View details button handlers
+    document.querySelectorAll('.view-details-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const staffId = this.getAttribute('data-staff-id');
+            viewDetails(staffId);
+        });
+    });
+
+    // Evaluate staff button handlers
+    document.querySelectorAll('.evaluate-staff-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const staffId = this.getAttribute('data-staff-id');
+            const staffName = this.getAttribute('data-staff-name');
+            openEvaluationModal(staffId, staffName, false, null);
+        });
+    });
+
+    // Edit evaluations button handlers
+    document.querySelectorAll('.edit-evaluations-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const staffId = this.getAttribute('data-staff-id');
+            const staffName = this.getAttribute('data-staff-name');
+            loadEvaluationsForEdit(staffId, staffName);
+        });
+    });
+
+    function openEvaluationModal(staffId, staffName, isEdit, evaluationData) {
+        isEditMode = isEdit;
+        document.getElementById('staffId').value = staffId;
+        document.getElementById('staffNameDisplay').value = staffName;
+        selectedTasks = [];
+
+        if (isEdit && evaluationData) {
+            document.querySelector('#createEvaluationModal .modal-title').innerHTML = 'Edit Evaluation';
+            document.getElementById('submitBtn').innerHTML = 'Update Evaluation';
+            document.getElementById('editModeInfo').style.display = 'block';
+            currentEvaluationId = evaluationData.evaluationId;
+            document.getElementById('score').value = evaluationData.score || '';
+            document.getElementById('remarks').value = evaluationData.remarks || '';
+            document.getElementById('year').value = evaluationData.year || new Date().getFullYear();
+            document.getElementById('quarter').value = evaluationData.quarter || (Math.floor(new Date().getMonth() / 3) + 1);
+            selectedTasks = [evaluationData.taskId];
+            loadTasksForStaff(staffId, evaluationData.taskId);
+        } else {
+            document.querySelector('#createEvaluationModal .modal-title').innerHTML = 'Evaluate Staff Performance';
+            document.getElementById('submitBtn').innerHTML = 'Submit Evaluation';
+            document.getElementById('editModeInfo').style.display = 'none';
+            currentEvaluationId = null;
+            document.getElementById('score').value = '';
+            document.getElementById('remarks').value = '';
+            const now = new Date();
+            document.getElementById('year').value = now.getFullYear();
+            document.getElementById('quarter').value = Math.floor(now.getMonth() / 3) + 1;
+            loadTasksForStaff(staffId, null);
+        }
+        new bootstrap.Modal(document.getElementById('createEvaluationModal')).show();
+    }
+
+    function updateDropdownDisplay() {
+        const count = selectedTasks.length;
+        const toggleBtn = document.getElementById('dropdownToggle');
+        if (count === 0) {
+            toggleBtn.querySelector('span:first-child').innerHTML = 'Select tasks...';
+            toggleBtn.querySelector('.selected-count').innerHTML = '(0 selected)';
+        } else {
+            toggleBtn.querySelector('span:first-child').innerHTML = `${count} task(s) selected`;
+            toggleBtn.querySelector('.selected-count').innerHTML = `(${count} selected)`;
+        }
+    }
+
+    function loadTasksForStaff(staffId, preselectedTaskId) {
+        const tasksListDiv = document.getElementById('tasksCheckboxList');
+        tasksListDiv.innerHTML = '<div class="text-center text-muted p-3"><div class="loading-spinner"></div> Loading tasks...</div>';
+
+        fetch(`/admin/api/staff-tasks?staffId=${staffId}`)
+            .then(response => response.json())
+            .then(tasks => {
+                if (tasks.length === 0) {
+                    tasksListDiv.innerHTML = '<div class="text-center text-muted p-3">No tasks assigned to this staff member.</div>';
+                } else {
+                    let html = '';
+                    tasks.forEach(task => {
+                        let displayText = task.title || task.description || 'Task #' + task.taskId;
+                        if (displayText.length > 60) displayText = displayText.substring(0, 57) + '...';
+                        const status = task.status || 'UNKNOWN';
+                        let statusIcon = '';
+                        let statusClass = '';
+                        if (status === 'COMPLETED') { statusIcon = '✅'; statusClass = 'text-success'; }
+                        else if (status === 'IN_PROGRESS') { statusIcon = '🔄'; statusClass = 'text-primary'; }
+                        else if (status === 'PENDING_REVIEW') { statusIcon = '⏳'; statusClass = 'text-warning'; }
+                        else if (status === 'APPROVED') { statusIcon = '✔️'; statusClass = 'text-info'; }
+                        else if (status === 'REJECTED') { statusIcon = '❌'; statusClass = 'text-danger'; }
+                        else { statusIcon = '📋'; statusClass = 'text-secondary'; }
+
+                        const isChecked = (preselectedTaskId && preselectedTaskId == task.taskId) || selectedTasks.includes(task.taskId.toString());
+                        if (isChecked && !selectedTasks.includes(task.taskId.toString())) {
+                            selectedTasks.push(task.taskId.toString());
+                        }
+
+                        html += `
+                            <div class="dropdown-item-checkbox">
+                                <input type="checkbox" class="task-checkbox" value="${task.taskId}" id="task_${task.taskId}" ${isChecked ? 'checked' : ''}>
+                                <label for="task_${task.taskId}">
+                                    <span class="${statusClass}">${statusIcon}</span>
+                                    <strong>${escapeHtml(displayText)}</strong>
+                                    <span class="badge ${status === 'COMPLETED' ? 'bg-success' : (status === 'IN_PROGRESS' ? 'bg-primary' : (status === 'PENDING_REVIEW' ? 'bg-warning' : 'bg-secondary'))} task-status-badge-small">${status}</span>
+                                    ${task.dueDate ? `<br><small class="text-muted">Due: ${new Date(task.dueDate).toLocaleDateString()}</small>` : ''}
+                                </label>
+                            </div>
+                        `;
+                    });
+                    tasksListDiv.innerHTML = html;
+
+                    document.querySelectorAll('.task-checkbox').forEach(cb => {
+                        cb.addEventListener('change', function() {
+                            if (this.checked) {
+                                if (!selectedTasks.includes(this.value)) selectedTasks.push(this.value);
+                            } else {
+                                selectedTasks = selectedTasks.filter(id => id !== this.value);
+                            }
+                            updateDropdownDisplay();
+                        });
+                    });
+                    updateDropdownDisplay();
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                tasksListDiv.innerHTML = '<div class="text-center text-danger p-3">Error loading tasks. Please try again.</div>';
+            });
+    }
+
+    // Dropdown toggle functionality
+    document.getElementById('dropdownToggle').addEventListener('click', function(e) {
+        e.stopPropagation();
+        const menu = document.getElementById('tasksDropdownMenu');
+        menu.classList.toggle('show');
+    });
+
+    document.addEventListener('click', function(e) {
+        const container = document.querySelector('.multi-select-dropdown');
+        if (container && !container.contains(e.target)) {
+            document.getElementById('tasksDropdownMenu').classList.remove('show');
+        }
+    });
+
+    document.getElementById('selectAllTasksBtn').addEventListener('click', function() {
+        document.querySelectorAll('.task-checkbox').forEach(cb => {
+            cb.checked = true;
+            if (!selectedTasks.includes(cb.value)) selectedTasks.push(cb.value);
+        });
+        updateDropdownDisplay();
+    });
+
+    document.getElementById('deselectAllTasksBtn').addEventListener('click', function() {
+        document.querySelectorAll('.task-checkbox').forEach(cb => {
+            cb.checked = false;
+            selectedTasks = [];
+        });
+        updateDropdownDisplay();
+    });
+
+    function loadEvaluationsForEdit(staffId, staffName) {
+        const contentDiv = document.getElementById('editEvaluationsContent');
+        contentDiv.innerHTML = '<div class="text-center"><div class="loading-spinner"></div><p class="mt-2">Loading evaluations...</p></div>';
+
+        fetch(`/admin/staff-evaluations/${staffId}`)
+            .then(response => response.json())
+            .then(data => {
+                const evaluations = data.recentEvaluations || [];
+                if (evaluations.length === 0) {
+                    contentDiv.innerHTML = '<div class="alert alert-info">No evaluations found for this staff member.</div>';
+                } else {
+                    let html = `<h5 class="mb-3">Evaluations for ${escapeHtml(staffName)}</h5>`;
+                    evaluations.forEach(eval => {
+                        html += `
+                            <div class="evaluation-card">
+                                <div class="row">
+                                    <div class="col-md-3"><strong>Task:</strong><br><small class="text-muted">${escapeHtml(eval.taskCode || 'N/A')}</small></div>
+                                    <div class="col-md-2"><strong>Score:</strong><br><span class="badge ${eval.score >= 70 ? 'bg-success' : (eval.score >= 50 ? 'bg-warning' : 'bg-danger')}">${eval.score}%</span></div>
+                                    <div class="col-md-2"><strong>Quarter:</strong><br>Q${eval.quarter} ${eval.year}</div>
+                                    <div class="col-md-3"><strong>Date:</strong><br>${new Date(eval.evaluationDate).toLocaleDateString()}</div>
+                                    <div class="col-md-2"><button class="btn btn-sm btn-primary edit-single-evaluation" data-evaluation-id="${eval.evaluationId}" data-staff-id="${staffId}" data-staff-name="${escapeHtml(staffName)}" data-task-id="${eval.taskId}" data-score="${eval.score}" data-remarks="${escapeHtml(eval.remarks)}" data-year="${eval.year}" data-quarter="${eval.quarter}"><i class="fas fa-edit"></i> Edit</button></div>
+                                </div>
+                                <div class="row mt-2"><div class="col-12"><strong>Remarks:</strong><br><small>${escapeHtml(eval.remarks || '-')}</small></div></div>
+                            </div>
+                        `;
+                    });
+                    contentDiv.innerHTML = html;
+                    document.querySelectorAll('.edit-single-evaluation').forEach(btn => {
+                        btn.addEventListener('click', function() {
+                            const evaluationData = { evaluationId: this.getAttribute('data-evaluation-id'), taskId: this.getAttribute('data-task-id'), score: this.getAttribute('data-score'), remarks: this.getAttribute('data-remarks'), year: this.getAttribute('data-year'), quarter: this.getAttribute('data-quarter') };
+                            const staffId = this.getAttribute('data-staff-id');
+                            const staffName = this.getAttribute('data-staff-name');
+                            bootstrap.Modal.getInstance(document.getElementById('editEvaluationsModal')).hide();
+                            openEvaluationModal(staffId, staffName, true, evaluationData);
+                        });
+                    });
+                }
+                new bootstrap.Modal(document.getElementById('editEvaluationsModal')).show();
+            })
+            .catch(error => { contentDiv.innerHTML = '<div class="alert alert-danger">Failed to load evaluations.</div>'; });
+    }
+
+    function viewDetails(staffId) {
+        const detailsContent = document.getElementById('detailsContent');
+        detailsContent.innerHTML = '<div class="text-center"><div class="loading-spinner"></div><p class="mt-2">Loading staff details...</p></div>';
+
+        fetch(`/admin/staff-evaluations/${staffId}`)
+            .then(response => response.json())
+            .then(data => {
+                function getStatusBadgeClass(status) {
+                    switch(status) {
+                        case 'COMPLETED': return 'bg-success';
+                        case 'IN_PROGRESS': return 'bg-primary';
+                        case 'PENDING_REVIEW': return 'bg-warning';
+                        case 'APPROVED': return 'bg-info';
+                        case 'REJECTED': return 'bg-danger';
+                        default: return 'bg-secondary';
+                    }
+                }
+
+                currentDetailsHtml = `
+                    <div class="print-area">
+                        <div class="row mb-3">
+                            <div class="col-md-6"><h4>${escapeHtml(data.staffName)}</h4><p><strong>Email:</strong> ${escapeHtml(data.staffEmail)}</p><p><strong>Staff Code:</strong> ${escapeHtml(data.staffCode)}</p></div>
+                            <div class="col-md-6"><p><strong>Branch:</strong> ${escapeHtml(data.branchName || 'N/A')}</p><p><strong>Department:</strong> ${escapeHtml(data.departmentName || 'N/A')}</p></div>
+                        </div>
+                        <hr>
+                        <h5>Performance Summary</h5>
+                        <div class="row mb-3">
+                            <div class="col-md-3"><div class="card bg-light"><div class="card-body text-center"><h6>Total Tasks</h6><h3>${data.totalTasks}</h3></div></div></div>
+                            <div class="col-md-3"><div class="card bg-light"><div class="card-body text-center"><h6>Completed</h6><h3>${data.completedTasks}</h3></div></div></div>
+                            <div class="col-md-3"><div class="card bg-light"><div class="card-body text-center"><h6>Completion Rate</h6><h3>${data.completionRate}%</h3></div></div></div>
+                            <div class="col-md-3"><div class="card bg-light"><div class="card-body text-center"><h6>Avg Score</h6><h3>${data.averageScore}%</h3></div></div></div>
+                        </div>
+                        <h5>All Tasks with Status</h5>
+                        <div class="table-responsive"><table class="table table-bordered"><thead class="table-dark"><tr><th>Task Code</th><th>Description</th><th>Status</th><th>Due Date</th><th>Evaluation Score</th><th>Remarks</th></tr></thead>
+                        <tbody>${(data.taskDetails || []).map(t => `<tr><td>${escapeHtml(t.taskCode || '-')}</td><td>${escapeHtml(t.taskTitle || t.taskDescription || '-')}</td><td><span class="badge ${getStatusBadgeClass(t.status)}">${escapeHtml(t.status)}</span></td><td>${t.dueDate ? new Date(t.dueDate).toLocaleDateString() : '-'}</td><td>${t.score ? t.score + '%' : 'Not Evaluated'}</td><td>${escapeHtml(t.remarks || '-')}</td>`).join('')}${(data.taskDetails || []).length === 0 ? '<tr><td colspan="6" class="text-center">No tasks assigned</td></tr>' : ''}</tbody></table></div>
+                        <h5 class="mt-4">Recent Evaluations</h5>
+                        <div class="table-responsive"><table class="table table-sm table-bordered"><thead><tr><th>Code</th><th>Score</th><th>Quarter</th><th>Date</th><th>Remarks</th></tr></thead>
+                        <tbody>${(data.recentEvaluations || []).map(e => `<tr><td>${escapeHtml(e.evaluationCode)}</td><td>${e.score}%</td><td>Q${e.quarter} ${e.year}</td><td>${new Date(e.evaluationDate).toLocaleDateString()}</td><td>${escapeHtml(e.remarks || '-')}</td></tr>`).join('')}${(data.recentEvaluations || []).length === 0 ? '<tr><td colspan="5" class="text-center">No evaluations yet</td></tr>' : ''}</tbody></table></div>
+                        <div class="alert alert-info mt-3"><strong>Performance Level:</strong> ${escapeHtml(data.performanceLevel)}</div>
+                    </div>
+                `;
+                document.getElementById('detailsContent').innerHTML = currentDetailsHtml;
+                new bootstrap.Modal(document.getElementById('detailsModal')).show();
+            })
+            .catch(error => { Swal.fire('Error', 'Failed to load staff details: ' + error.message, 'error'); });
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function printDetails() {
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(`<html><head><title>Staff Evaluation Details</title><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet"><style>body{padding:20px}@media print{body{padding:0}.btn,.no-print{display:none}}.table{width:100%;border-collapse:collapse}.table th,.table td{border:1px solid #ddd;padding:8px}</style></head><body>${currentDetailsHtml}<script>window.print();<\/script></body></html>`);
+        printWindow.document.close();
+    }
+
+    document.getElementById('resetFormBtn').addEventListener('click', function() {
+        document.getElementById('score').value = '';
+        document.getElementById('remarks').value = '';
+        document.querySelectorAll('.task-checkbox').forEach(cb => { cb.checked = false; });
+        selectedTasks = [];
+        updateDropdownDisplay();
+        const now = new Date();
+        document.getElementById('year').value = now.getFullYear();
+        document.getElementById('quarter').value = Math.floor(now.getMonth() / 3) + 1;
+        Swal.fire('Reset', 'Form has been reset', 'info');
+    });
+
+    document.getElementById('createEvaluationModal').addEventListener('hidden.bs.modal', function() {
+        document.getElementById('staffId').value = '';
+        document.getElementById('staffNameDisplay').value = '';
+        document.getElementById('score').value = '';
+        document.getElementById('remarks').value = '';
+        selectedTasks = [];
+        document.getElementById('tasksDropdownMenu').classList.remove('show');
+    });
+
+    document.getElementById('exportExcelBtn').addEventListener('click', function() {
+        const table = document.getElementById('evaluationTable');
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.table_to_sheet(table, { raw: true });
+        XLSX.utils.book_append_sheet(wb, ws, 'Staff Evaluations');
+        XLSX.writeFile(wb, `staff_evaluations_${new Date().toISOString().split('T')[0]}.xlsx`);
+        Swal.fire('Success', 'Report exported successfully', 'success');
+    });
+
+    // Add branch change listener for dependent dropdown
+    document.getElementById('branchSelect').addEventListener('change', function() {
+        filterDepartmentsByBranch();
+    });
+
+    document.getElementById('evaluationForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const staffId = document.getElementById('staffId').value;
+        const score = document.getElementById('score').value;
+        const remarks = document.getElementById('remarks').value;
+        const year = document.getElementById('year').value;
+        const quarter = document.getElementById('quarter').value;
+
+        if (!staffId) { Swal.fire('Error', 'Please select a staff member', 'error'); return; }
+        if (selectedTasks.length === 0) { Swal.fire('Error', 'Please select at least one task to evaluate', 'error'); return; }
+        if (!remarks || remarks.trim() === '') { Swal.fire('Error', 'Remarks are required for evaluation', 'error'); return; }
+
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="loading-spinner"></span> Submitting...';
+
+        let successCount = 0, errorCount = 0;
+        for (const taskId of selectedTasks) {
+            const formData = new URLSearchParams();
+            formData.append('staffId', staffId);
+            formData.append('taskId', taskId);
+            if (score) formData.append('score', score);
+            formData.append('remarks', remarks);
+            formData.append('year', year);
+            formData.append('quarter', quarter);
+            try {
+                const response = await fetch('/admin/staff-evaluations/create', { method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: formData });
+                const result = await response.json();
+                if (result.success) successCount++; else errorCount++;
+            } catch (error) { errorCount++; }
+        }
+
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+        if (successCount > 0) {
+            Swal.fire('Success', `Evaluated ${successCount} task(s) successfully. ${errorCount > 0 ? errorCount + ' failed.' : ''}`, 'success').then(() => location.reload());
+        } else {
+            Swal.fire('Error', 'Failed to create evaluations', 'error');
+        }
+    });
+
+    // Initialize dependent dropdowns
+    initDepartments();
+    filterDepartmentsByBranch();
+    updateEligibleCount();
+</script>
+</body>
+</html>
