@@ -23,15 +23,34 @@
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
     <style>
-        /* Vertical buttons for actions */
         .action-buttons button {
-            display: block;
-            width: 40px;
-            margin: 5px auto;
+            display: inline-block;
+            width: 35px;
+            margin: 2px;
             padding: 5px;
         }
         .action-buttons i {
-            font-size: 1.2rem;
+            font-size: 1rem;
+        }
+        .filter-card {
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .status-badge {
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        .status-active {
+            background-color: #2ECC71;
+            color: white;
+        }
+        .status-inactive {
+            background-color: #E76F51;
+            color: white;
         }
     </style>
 </head>
@@ -47,41 +66,83 @@
         <a href="/admin/dashboard" class="btn btn-secondary ms-3">⬅ Back Home</a>
     </div>
 
-    <!-- Search Card -->
-    <div class="card mb-4">
-        <div class="card-header bg-primary text-light">Search User by Staff Code</div>
-        <div class="card-body">
-            <div class="input-group">
-                <input type="number" id="searchStaffCode" class="form-control" placeholder="Enter Staff Code">
+    <!-- Filter Section -->
+    <div class="filter-card">
+        <h5 class="mb-3"><i class="bi bi-funnel-fill"></i> Filter Users</h5>
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">Branch</label>
+                <select id="filterBranch" class="form-control select2">
+                    <option value="">All Branches</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">Department</label>
+                <select id="filterDepartment" class="form-control select2">
+                    <option value="">All Departments</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">Role</label>
+                <select id="filterRole" class="form-control select2">
+                    <option value="">All Roles</option>
+                    <option value="ADMIN">Admin</option>
+                    <option value="SUPERVISOR">Supervisor</option>
+                    <option value="STAFF">Staff</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">Status</label>
+                <select id="filterStatus" class="form-control select2">
+                    <option value="">All Status</option>
+                    <option value="true">Active</option>
+                    <option value="false">Inactive</option>
+                </select>
+            </div>
+        </div>
+        <div class="row mt-3">
+            <div class="col-md-6">
+                <label class="form-label fw-semibold">Search by Staff Code or Name</label>
+                <input type="text" id="searchStaffCode" class="form-control" placeholder="Enter Staff Code or Name...">
+            </div>
+            <div class="col-md-6 d-flex align-items-end">
+                <button id="resetFilters" class="btn btn-secondary w-100">
+                    <i class="bi bi-arrow-repeat"></i> Reset Filters
+                </button>
             </div>
         </div>
     </div>
 
     <!-- Users Table -->
     <div class="card">
-        <div class="card-header bg-primary text-light">All Users</div>
+        <div class="card-header bg-primary text-light d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-people-fill"></i> All Users</span>
+            <span id="userCount" class="badge bg-light text-dark">0 Users</span>
+        </div>
         <div class="card-body position-relative">
             <!-- Loader -->
             <div id="loader" class="text-center py-3" style="display:none;">
                 <div class="spinner-border text-primary" role="status"></div>
             </div>
 
-            <table class="table table-striped" id="usersTable">
-                <thead>
-                <tr>
-                    <th>Staff Code</th>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Phone</th>
-                    <th>Role</th>
-                    <th>Rank</th>
-                    <th>Department</th>
-                    <th>Branch</th>
-                    <th class="text-center">Action</th>
-                </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
+            <div class="table-responsive">
+                <table class="table table-striped table-hover" id="usersTable">
+                    <thead>
+                    <tr>
+                        <th>Staff Code</th>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th>Department</th>
+                        <th>Branch</th>
+                        <th class="text-center">Actions</th>
+                    </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
 
             <!-- Pagination Controls -->
             <nav aria-label="User pagination" class="mt-3">
@@ -97,7 +158,7 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header bg-primary text-light">
-                <h5 class="modal-title">User Details</h5>
+                <h5 class="modal-title"><i class="bi bi-person-badge-fill"></i> User Details</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body" id="userModalBody"></div>
@@ -107,57 +168,69 @@
 
 <!-- Edit Modal -->
 <div class="modal fade" id="editUserModal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header bg-primary text-light">
-                <h5 class="modal-title">Edit User</h5>
+                <h5 class="modal-title"><i class="bi bi-pencil-square"></i> Edit User</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <form id="editUserForm">
                     <input type="hidden" id="editStaffCode">
 
-                    <div class="mb-3">
-                        <label class="form-label">First Name</label>
-                        <input type="text" class="form-control" id="editFirstName" required>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">First Name</label>
+                            <input type="text" class="form-control" id="editFirstName" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Other Name</label>
+                            <input type="text" class="form-control" id="editOtherName">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" id="editEmail" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Phone</label>
+                            <input type="text" class="form-control" id="editPhone">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Role</label>
+                            <select class="form-select select2" id="editRole">
+                                <option value="ADMIN">Admin</option>
+                                <option value="SUPERVISOR">Supervisor</option>
+                                <option value="STAFF">Staff</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Rank</label>
+                            <input type="text" class="form-control" id="editRank">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Branch</label>
+                            <select class="form-select select2" id="editBranch">
+                                <option value="">Select Branch</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Department</label>
+                            <select class="form-select select2" id="editDepartment">
+                                <option value="">Select Department</option>
+                            </select>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">Status</label>
+                            <select class="form-select select2" id="editStatus">
+                                <option value="true">Active</option>
+                                <option value="false">Inactive</option>
+                            </select>
+                        </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label">Other Name</label>
-                        <input type="text" class="form-control" id="editOtherName">
+                    <div class="mt-4">
+                        <button type="submit" class="btn btn-primary w-100">Save Changes</button>
                     </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Email</label>
-                        <input type="email" class="form-control" id="editEmail" required>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Phone</label>
-                        <input type="text" class="form-control" id="editPhone">
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Role</label>
-                        <select class="form-select select2" id="editRole"></select>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Rank</label>
-                        <input type="text" class="form-control" id="editRank">
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Department</label>
-                        <select class="form-select select2" id="editDepartment"></select>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Branch</label>
-                        <select class="form-select select2" id="editBranch"></select>
-                    </div>
-
-                    <button type="submit" class="btn btn-primary w-100">Save Changes</button>
                 </form>
             </div>
         </div>
@@ -169,7 +242,7 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header bg-danger text-light">
-                <h5 class="modal-title">Confirm Delete</h5>
+                <h5 class="modal-title"><i class="bi bi-exclamation-triangle-fill"></i> Confirm Delete</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -184,8 +257,8 @@
 </div>
 
 <!-- Toast -->
-<div class="position-fixed bottom-0 end-0 p-3">
-    <div id="liveToast" class="toast align-items-center text-white bg-success border-0">
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 9999;">
+    <div id="liveToast" class="toast align-items-center text-white bg-success border-0" role="alert">
         <div class="d-flex">
             <div class="toast-body" id="toastMsg"></div>
             <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
@@ -196,36 +269,129 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     const baseUrl = '/users';
-    let deleteStaffCode = null;
-    let usersData = [];
+    let allUsers = [];
+    let filteredUsers = [];
+    let branches = [];
+    let departments = [];
     let currentPage = 1;
-    const rowsPerPage = 100;
+    const rowsPerPage = 10;
+
+    // Initialize Select2 and load data
+    $(document).ready(function() {
+        $('.select2').select2({ width: '100%', placeholder: 'Select option' });
+        loadBranches();
+        loadDepartments();
+        loadUsers();
+    });
+
+    // Load branches for filter
+    async function loadBranches() {
+        try {
+            const res = await axios.get('/branches');
+            branches = res.data;
+
+            let options = '<option value="">All Branches</option>';
+            branches.forEach(b => {
+                options += `<option value="${b.branchId}">${b.branchName}</option>`;
+            });
+            $('#filterBranch').html(options);
+            $('#editBranch').html('<option value="">Select Branch</option>' +
+                branches.map(b => `<option value="${b.branchId}">${b.branchName}</option>`).join(''));
+
+            $('.select2').trigger('change');
+        } catch(err) {
+            console.error('Failed to load branches', err);
+        }
+    }
+
+    // Load departments for filter
+    async function loadDepartments() {
+        try {
+            const res = await axios.get('/departments');
+            departments = res.data;
+
+            let options = '<option value="">All Departments</option>';
+            departments.forEach(d => {
+                options += `<option value="${d.departmentId}">${d.departmentName}</option>`;
+            });
+            $('#filterDepartment').html(options);
+
+            $('.select2').trigger('change');
+        } catch(err) {
+            console.error('Failed to load departments', err);
+        }
+    }
+
+    // Filter departments based on selected branch (for edit modal)
+    $('#editBranch').on('change', function() {
+        const branchId = $(this).val();
+        let options = '<option value="">Select Department</option>';
+
+        const filteredDepts = branchId ? departments.filter(d => d.branch?.branchId == branchId) : departments;
+
+        filteredDepts.forEach(d => {
+            options += `<option value="${d.departmentId}">${d.departmentName}</option>`;
+        });
+        $('#editDepartment').html(options).trigger('change');
+    });
+
+    // Apply filters
+    function applyFilters() {
+        const branchId = $('#filterBranch').val();
+        const departmentId = $('#filterDepartment').val();
+        const role = $('#filterRole').val();
+        const status = $('#filterStatus').val();
+        const searchTerm = $('#searchStaffCode').val().toLowerCase();
+
+        filteredUsers = allUsers.filter(user => {
+            let match = true;
+
+            if (branchId && user.branchId != branchId) match = false;
+            if (departmentId && user.departmentId != departmentId) match = false;
+            if (role && user.role !== role) match = false;
+            if (status && String(user.active) !== status) match = false;
+            if (searchTerm) {
+                const staffCodeMatch = user.staffCode?.toString().includes(searchTerm);
+                const nameMatch = `${user.firstName} ${user.otherName || ''}`.toLowerCase().includes(searchTerm);
+                if (!staffCodeMatch && !nameMatch) match = false;
+            }
+
+            return match;
+        });
+
+        $('#userCount').text(`${filteredUsers.length} Users`);
+        currentPage = 1;
+        displayUsersPage();
+    }
 
     // Display users with pagination
-    function displayUsersPage(page = 1) {
-        currentPage = page;
+    function displayUsersPage() {
         const tbody = $('#usersTable tbody').empty();
-        const start = (page - 1) * rowsPerPage;
+        const start = (currentPage - 1) * rowsPerPage;
         const end = start + rowsPerPage;
-        const pageUsers = usersData.slice(start, end);
+        const pageUsers = filteredUsers.slice(start, end);
 
         if(pageUsers.length === 0){
-            tbody.append('<tr><td colspan="9" class="text-center">No user found</td></tr>');
+            tbody.append('<tr><td colspan="9" class="text-center">No users found</td></tr>');
         }
 
         pageUsers.forEach(user => {
+            const statusBadge = user.active ?
+                '<span class="status-badge status-active">Active</span>' :
+                '<span class="status-badge status-inactive">Inactive</span>';
+
             const tr = `
             <tr>
                 <td>${user.staffCode}</td>
                 <td>${user.firstName} ${user.otherName || ''}</td>
-                <td>${user.email}</td>
+                <td>${user.email || ''}</td>
                 <td>${user.phoneNumber || ''}</td>
-                <td>${user.role || ''}</td>
-                <td>${user.rank || ''}</td>
-                <td>${user.departmentName || ''}</td>
-                <td>${user.branchName || ''}</td>
+                <td><span class="badge bg-secondary">${user.role || ''}</span></td>
+                <td>${statusBadge}</td>
+                <td>${user.departmentName || '-'}</td>
+                <td>${user.branchName || '-'}</td>
                 <td class="text-center action-buttons">
-                    <button class="btn btn-sm btn-info" title="View" onclick='viewUserObj(${JSON.stringify(user)})'>
+                    <button class="btn btn-sm btn-info" title="View" onclick='viewUser(${JSON.stringify(user).replace(/'/g, "&apos;")})'>
                         <i class="bi bi-eye-fill"></i>
                     </button>
                     <button class="btn btn-sm btn-primary" title="Edit" onclick="editUser(${user.staffCode})">
@@ -235,8 +401,7 @@
                         <i class="bi bi-trash-fill"></i>
                     </button>
                 </td>
-            </tr>
-        `;
+            </tr>`;
             tbody.append(tr);
         });
 
@@ -245,7 +410,7 @@
 
     // Render pagination
     function renderPagination() {
-        const totalPages = Math.ceil(usersData.length / rowsPerPage);
+        const totalPages = Math.ceil(filteredUsers.length / rowsPerPage);
         const pagination = $('#pagination').empty();
 
         if(totalPages <= 1){
@@ -254,14 +419,29 @@
         }
         $('#pagination').show();
 
+        // Previous button
+        if(currentPage > 1) {
+            pagination.append(`<li class="page-item"><a class="page-link" href="#" data-page="${currentPage-1}">«</a></li>`);
+        }
+
         for(let i = 1; i <= totalPages; i++){
-            const li = $(`<li class="page-item ${i === currentPage ? 'active' : ''}"><a class="page-link" href="#">${i}</a></li>`);
-            li.on('click', function(e){
-                e.preventDefault();
-                displayUsersPage(i);
-            });
+            const li = $(`<li class="page-item ${i === currentPage ? 'active' : ''}"><a class="page-link" href="#" data-page="${i}">${i}</a></li>`);
             pagination.append(li);
         }
+
+        // Next button
+        if(currentPage < totalPages) {
+            pagination.append(`<li class="page-item"><a class="page-link" href="#" data-page="${currentPage+1}">»</a></li>`);
+        }
+
+        $('.page-link').on('click', function(e){
+            e.preventDefault();
+            const page = $(this).data('page');
+            if(page) {
+                currentPage = page;
+                displayUsersPage();
+            }
+        });
     }
 
     // Load all users
@@ -269,30 +449,58 @@
         $('#loader').show();
         try {
             const res = await axios.get(`${baseUrl}/fetchAllUsers`);
-            usersData = res.data;
-            displayUsersPage(1);
+            allUsers = res.data;
+            applyFilters();
         } catch (err) {
             console.error('Failed to load users', err);
-            usersData = [];
-            displayUsersPage(1);
+            allUsers = [];
+            filteredUsers = [];
+            displayUsersPage();
         } finally {
             $('#loader').hide();
         }
     }
 
-    // View user modal
-    function viewUserObj(user) {
+    // View user
+    function viewUser(user) {
+        const statusBadge = user.active ?
+            '<span class="status-badge status-active">Active</span>' :
+            '<span class="status-badge status-inactive">Inactive</span>';
+
         const modalBody = document.getElementById('userModalBody');
         modalBody.innerHTML = `
-        <p><strong>Staff Code:</strong> ${user.staffCode}</p>
-        <p><strong>Name:</strong> ${user.firstName} ${user.otherName || ''}</p>
-        <p><strong>Email:</strong> ${user.email}</p>
-        <p><strong>Phone:</strong> ${user.phoneNumber || ''}</p>
-        <p><strong>Role:</strong> ${user.role || ''}</p>
-        <p><strong>Rank:</strong> ${user.rank || ''}</p>
-        <p><strong>Department:</strong> ${user.departmentName || ''}</p>
-        <p><strong>Branch:</strong> ${user.branchName || ''}</p>
-    `;
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong><i class="bi bi-qr-code"></i> Staff Code:</strong></p>
+                    <p><strong><i class="bi bi-person"></i> Name:</strong></p>
+                    <p><strong><i class="bi bi-envelope"></i> Email:</strong></p>
+                    <p><strong><i class="bi bi-telephone"></i> Phone:</strong></p>
+                </div>
+                <div class="col-md-6">
+                    <p>${user.staffCode}</p>
+                    <p>${user.firstName} ${user.otherName || ''}</p>
+                    <p>${user.email || '-'}</p>
+                    <p>${user.phoneNumber || '-'}</p>
+                </div>
+            </div>
+            <hr>
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong><i class="bi bi-tag"></i> Role:</strong></p>
+                    <p><strong><i class="bi bi-star"></i> Rank:</strong></p>
+                    <p><strong><i class="bi bi-building"></i> Department:</strong></p>
+                    <p><strong><i class="bi bi-shop"></i> Branch:</strong></p>
+                    <p><strong><i class="bi bi-toggle-on"></i> Status:</strong></p>
+                </div>
+                <div class="col-md-6">
+                    <p><span class="badge bg-secondary">${user.role || '-'}</span></p>
+                    <p>${user.rank || '-'}</p>
+                    <p>${user.departmentName || '-'}</p>
+                    <p>${user.branchName || '-'}</p>
+                    <p>${statusBadge}</p>
+                </div>
+            </div>
+        `;
         new bootstrap.Modal(document.getElementById('userViewModal')).show();
     }
 
@@ -308,33 +516,22 @@
             $('#editEmail').val(u.email || '');
             $('#editPhone').val(u.phoneNumber || '');
             $('#editRank').val(u.rank || '');
+            $('#editRole').val(u.role).trigger('change');
+            $('#editStatus').val(String(u.active)).trigger('change');
 
-            const [rolesRes, deptRes, branchRes] = await Promise.all([
-                axios.get(`${baseUrl}/roles`),
-                axios.get(`${baseUrl}/departments`),
-                axios.get(`${baseUrl}/branches`)
-            ]);
+            // Load branches and set value
+            await loadBranches();
+            $('#editBranch').val(u.branchId).trigger('change');
 
-            const modalEl = $('#editUserModal');
-
-            const roleSelect = $('#editRole', modalEl).empty();
-            rolesRes.data.forEach(r => roleSelect.append(new Option(r, r, r===u.role, r===u.role)));
-
-            const deptSelect = $('#editDepartment', modalEl).empty();
-            deptRes.data.forEach(d => deptSelect.append(new Option(d.name, d.id, d.id===u.departmentId, d.id===u.departmentId)));
-
-            const branchSelect = $('#editBranch', modalEl).empty();
-            branchRes.data.forEach(b => branchSelect.append(new Option(b.name, b.id, b.id===u.branchId, b.id===u.branchId)));
-
-            $('.select2', modalEl).select2({ dropdownParent: modalEl, width: '100%' });
-            roleSelect.val(u.role).trigger('change');
-            deptSelect.val(u.departmentId).trigger('change');
-            branchSelect.val(u.branchId).trigger('change');
+            // Wait for branch change to load departments, then set department
+            setTimeout(() => {
+                $('#editDepartment').val(u.departmentId).trigger('change');
+            }, 200);
 
             new bootstrap.Modal(document.getElementById('editUserModal')).show();
         } catch(err) {
             console.error(err);
-            alert('Failed to load user for editing.');
+            showToast('Failed to load user for editing', 'error');
         }
     }
 
@@ -349,67 +546,71 @@
             phoneNumber: $('#editPhone').val(),
             role: $('#editRole').val(),
             rank: $('#editRank').val(),
-            departmentId: $('#editDepartment').val(),
-            branchId: $('#editBranch').val()
+            departmentId: $('#editDepartment').val() || null,
+            branchId: $('#editBranch').val() || null,
+            active: $('#editStatus').val() === 'true'
         };
+
         axios.put(`${baseUrl}/updateUser/${staffCode}`, data)
             .then(() => {
-                showToast('User updated successfully');
+                showToast('User updated successfully', 'success');
                 loadUsers();
                 bootstrap.Modal.getInstance(document.getElementById('editUserModal')).hide();
             })
-            .catch(err => alert('Update failed: ' + (err.response?.data?.message || err)));
+            .catch(err => {
+                const msg = err.response?.data?.message || 'Update failed';
+                showToast(msg, 'error');
+            });
     });
 
     // Delete user modal
     function showDeleteModal(staffCode) {
-        deleteStaffCode = staffCode;
         $('#deleteStaffCode').text(staffCode);
+        window.deleteStaffCode = staffCode;
         new bootstrap.Modal(document.getElementById('deleteUserModal')).show();
     }
 
     $('#confirmDeleteBtn').on('click', function(){
-        if(deleteStaffCode){
-            axios.delete(`${baseUrl}/deleteUser/${deleteStaffCode}`)
+        if(window.deleteStaffCode){
+            axios.delete(`${baseUrl}/deleteUser/${window.deleteStaffCode}`)
                 .then(() => {
-                    showToast('User deleted');
+                    showToast('User deleted successfully', 'success');
                     loadUsers();
                     bootstrap.Modal.getInstance(document.getElementById('deleteUserModal')).hide();
-                    deleteStaffCode = null;
+                    window.deleteStaffCode = null;
                 })
-                .catch(() => alert('Delete failed'));
+                .catch(err => {
+                    showToast('Delete failed: ' + (err.response?.data?.message || err.message), 'error');
+                });
         }
     });
 
-    // Live search
-    let searchTimeout = null;
+    // Filter event listeners
+    $('#filterBranch, #filterDepartment, #filterRole, #filterStatus').on('change', applyFilters);
     $('#searchStaffCode').on('input', function() {
-        const staffCode = $(this).val().trim();
-        clearTimeout(searchTimeout);
+        clearTimeout(window.searchTimeout);
+        window.searchTimeout = setTimeout(applyFilters, 300);
+    });
 
-        if(!staffCode) {
-            loadUsers();
-            return;
-        }
-
-        searchTimeout = setTimeout(() => {
-            axios.get(`${baseUrl}/fetchUser/${staffCode}`)
-                .then(res => {
-                    const u = res.data;
-                    usersData = u ? [u] : [];
-                    displayUsersPage(1);
-                })
-                .catch(() => {
-                    usersData = [];
-                    displayUsersPage(1);
-                });
-        }, 300);
+    $('#resetFilters').on('click', function() {
+        $('#filterBranch').val('').trigger('change');
+        $('#filterDepartment').val('').trigger('change');
+        $('#filterRole').val('').trigger('change');
+        $('#filterStatus').val('').trigger('change');
+        $('#searchStaffCode').val('');
+        applyFilters();
     });
 
     // Toast helper
-    function showToast(msg){
+    function showToast(msg, type = 'success') {
+        const toastEl = $('#liveToast');
+        if(type === 'error') {
+            toastEl.removeClass('bg-success').addClass('bg-danger');
+        } else {
+            toastEl.removeClass('bg-danger').addClass('bg-success');
+        }
         $('#toastMsg').text(msg);
-        new bootstrap.Toast(document.getElementById('liveToast')).show();
+        new bootstrap.Toast(toastEl[0], { delay: 3000 }).show();
     }
 
     // Reset modals after close
@@ -418,11 +619,8 @@
         $('.select2', this).val(null).trigger('change');
     });
     $('#deleteUserModal').on('hidden.bs.modal', function () {
-        deleteStaffCode = null;
+        window.deleteStaffCode = null;
     });
-
-    // Initial load
-    loadUsers();
 </script>
 
 </body>

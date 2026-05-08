@@ -68,6 +68,9 @@ public class AdminDashboardController {
             model.addAttribute("staffByBranch", adminDashboardService.getStaffCountByBranch());
             model.addAttribute("staffByDepartment", adminDashboardService.getStaffCountByDepartment());
             model.addAttribute("supervisorByDepartment", adminDashboardService.getSupervisorCountByDepartment());
+
+            // Add department performance grouped by branch
+            model.addAttribute("departmentPerformanceByBranch", adminDashboardService.getDepartmentPerformanceByBranch());
             model.addAttribute("departmentPerformance", adminDashboardService.getDepartmentPerformance());
             model.addAttribute("branchPerformance", adminDashboardService.getBranchPerformance());
             model.addAttribute("recentAssignments", adminDashboardService.getRecentAssignments(5));
@@ -129,7 +132,7 @@ public class AdminDashboardController {
     }
 
     // =========================
-    // STAFF EVALUATIONS PAGE
+    // STAFF EVALUATIONS PAGE - FIXED with staffPerformance
     // =========================
     @GetMapping("/staff-evaluations")
     public String staffEvaluations(Model model) {
@@ -158,6 +161,9 @@ public class AdminDashboardController {
             model.addAttribute("overallCompletionRate", Math.round(overallCompletionRate * 100.0) / 100.0);
             model.addAttribute("totalStaff", evaluations.size());
 
+            // ✅ ADDED: Staff performance data for the evaluation table
+            model.addAttribute("staffPerformance", adminDashboardService.getStaffPerformanceStats());
+
             return "layout/admin/staff-evaluations";
 
         } catch (Exception e) {
@@ -168,7 +174,7 @@ public class AdminDashboardController {
     }
 
     // =========================
-    // STAFF EVALUATIONS FILTERED
+    // STAFF EVALUATIONS FILTERED - FIXED with staffPerformance
     // =========================
     @GetMapping("/staff-evaluations/filter")
     public String staffEvaluationsFiltered(
@@ -207,6 +213,9 @@ public class AdminDashboardController {
             model.addAttribute("overallCompletionRate", Math.round(overallCompletionRate * 100.0) / 100.0);
             model.addAttribute("totalStaff", evaluations.size());
 
+            // ✅ ADDED: Staff performance data for filtered view
+            model.addAttribute("staffPerformance", adminDashboardService.getStaffPerformanceStats());
+
             return "layout/admin/staff-evaluations";
 
         } catch (Exception e) {
@@ -232,13 +241,12 @@ public class AdminDashboardController {
     }
 
     // =========================
-    // API: GET STAFF TASKS FOR EVALUATION - FIXED: Only returns tasks for the specific staff member
+    // API: GET STAFF TASKS FOR EVALUATION
     // =========================
     @GetMapping("/api/staff-tasks")
     @ResponseBody
     public ResponseEntity<?> getStaffTasks(@RequestParam Long staffId) {
         try {
-            // Verify staff exists and is actually a STAFF role
             User staff = userRepository.findByStaffId(staffId).orElse(null);
             if (staff == null) {
                 return ResponseEntity.badRequest().body(Map.of("error", "Staff not found"));
@@ -247,11 +255,10 @@ public class AdminDashboardController {
                 return ResponseEntity.badRequest().body(Map.of("error", "User is not a staff member"));
             }
 
-            // Get tasks ONLY for this specific staff member
             List<TaskAssignment> assignments = taskAssignmentRepository.findByAssignUser_StaffId(staffId);
 
             List<Map<String, Object>> tasks = assignments.stream()
-                    .filter(a -> a.getAssignUser().getStaffId().equals(staffId)) // Double filter for safety
+                    .filter(a -> a.getAssignUser().getStaffId().equals(staffId))
                     .map(a -> {
                         Map<String, Object> task = new HashMap<>();
                         Task t = a.getTask();
@@ -400,6 +407,8 @@ public class AdminDashboardController {
             model.addAttribute("staffByBranch", adminDashboardService.getStaffCountByBranchFiltered(branchId, deptId));
             model.addAttribute("staffByDepartment", adminDashboardService.getStaffCountByDepartmentFiltered(branchId, deptId));
             model.addAttribute("supervisorByDepartment", adminDashboardService.getSupervisorCountByDepartmentFiltered(deptId));
+
+            model.addAttribute("departmentPerformanceByBranch", adminDashboardService.getDepartmentPerformanceByBranchFiltered(branchId, deptId, quarter));
             model.addAttribute("departmentPerformance", adminDashboardService.getDepartmentPerformanceFiltered(branchId, deptId, quarter));
             model.addAttribute("branchPerformance", adminDashboardService.getBranchPerformanceFiltered(branchId, deptId, quarter));
             model.addAttribute("recentAssignments", adminDashboardService.getRecentAssignmentsFiltered(5, branchId, deptId, quarter));

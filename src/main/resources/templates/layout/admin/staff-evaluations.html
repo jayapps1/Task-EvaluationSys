@@ -8,6 +8,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
+        /* Your existing styles remain the same */
         @media print {
             .sidebar, .btn, .filter-section, .no-print, .actions-column, .card-header .btn {
                 display: none !important;
@@ -127,6 +128,10 @@
             padding: 2px 6px;
             margin-left: 8px;
         }
+        .score-value {
+            font-size: 1.1rem;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -187,7 +192,7 @@
                     <div class="card text-white bg-primary">
                         <div class="card-body">
                             <h5 class="card-title">Total Staff</h5>
-                            <h2 th:text="${totalStaff}">0</h2>
+                            <h2 th:text="${totalStaff != null ? totalStaff : 0}">0</h2>
                         </div>
                     </div>
                 </div>
@@ -195,7 +200,7 @@
                     <div class="card text-white bg-success">
                         <div class="card-body">
                             <h5 class="card-title">Average Score</h5>
-                            <h2 th:text="${overallAvgScore + '%'}">0%</h2>
+                            <h2 th:text="${overallAvgScore != null ? overallAvgScore + '%' : '0%'}">0%</h2>
                         </div>
                     </div>
                 </div>
@@ -203,7 +208,7 @@
                     <div class="card text-white bg-info">
                         <div class="card-body">
                             <h5 class="card-title">Completion Rate</h5>
-                            <h2 th:text="${overallCompletionRate + '%'}">0%</h2>
+                            <h2 th:text="${overallCompletionRate != null ? overallCompletionRate + '%' : '0%'}">0%</h2>
                         </div>
                     </div>
                 </div>
@@ -279,26 +284,26 @@
                             </tr>
                             </thead>
                             <tbody>
-                            <tr th:each="eval : ${evaluations}" th:data-staff-id="${eval.staffId}" th:data-total-tasks="${eval.totalTasks}" th:data-completed-tasks="${eval.completedTasks}">
-                                <td th:text="${eval.staffName}"></td>
-                                <td th:text="${eval.branchName}">-</td>
-                                <td th:text="${eval.departmentName}">-</td>
-                                <td th:text="${eval.totalTasks}">0</td>
-                                <td th:text="${eval.completedTasks}">0</td>
-                                <td th:text="${eval.pendingTasks}">0</td>
+                            <tr th:each="eval : ${evaluations}" th:data-staff-id="${eval.staffId}">
+                                <td th:text="${eval.staffName}">N/A</td>
+                                <td th:text="${eval.branchName != null ? eval.branchName : 'Not Assigned'}">-</td>
+                                <td th:text="${eval.departmentName != null ? eval.departmentName : 'Not Assigned'}">-</td>
+                                <td th:text="${eval.totalTasks != null ? eval.totalTasks : 0}">0</td>
+                                <td th:text="${eval.completedTasks != null ? eval.completedTasks : 0}">0</td>
+                                <td th:text="${eval.pendingTasks != null ? eval.pendingTasks : 0}">0</td>
                                 <td>
                                     <div class="progress" style="height: 25px;">
                                         <div class="progress-bar"
-                                             th:style="'width: ' + ${eval.completionRate} + '%;'"
-                                             th:classappend="${eval.completionRate >= 70 ? 'bg-success' : (eval.completionRate >= 50 ? 'bg-warning' : 'bg-danger')}"
-                                             th:text="${eval.completionRate + '%'}">
+                                             th:style="'width: ' + (${eval.completionRate != null ? eval.completionRate : 0}) + '%;'"
+                                             th:classappend="${eval.completionRate != null && eval.completionRate >= 70 ? 'bg-success' : (eval.completionRate != null && eval.completionRate >= 50 ? 'bg-warning' : 'bg-danger')}"
+                                             th:text="${eval.completionRate != null ? eval.completionRate + '%' : '0%'}">
                                         </div>
                                     </div>
                                 </td>
                                 <td>
-                                    <span th:classappend="${eval.averageScore >= 70 ? 'badge bg-success' : (eval.averageScore >= 50 ? 'badge bg-warning' : 'badge bg-danger')}"
-                                          class="badge"
-                                          th:text="${eval.averageScore + '%'}">
+                                    <span th:classappend="${eval.averageScore != null && eval.averageScore >= 70 ? 'badge bg-success' : (eval.averageScore != null && eval.averageScore >= 50 ? 'badge bg-warning' : 'badge bg-danger')}"
+                                          class="badge score-value"
+                                          th:text="${eval.averageScore != null ? eval.averageScore + '%' : '0%'}">
                                     </span>
                                 </td>
                                 <td>
@@ -308,21 +313,19 @@
                                                           (eval.performanceLevel == 'Needs Improvement' ? 'badge bg-warning' :
                                                           (eval.performanceLevel == 'Poor' ? 'badge bg-danger' : 'badge bg-secondary'))))}"
                                           class="badge"
-                                          th:text="${eval.performanceLevel}">
+                                          th:text="${eval.performanceLevel != null ? eval.performanceLevel : 'Not Evaluated'}">
                                     </span>
                                 </td>
                                 <td class="actions-column">
-                                    <button class="btn btn-sm btn-info view-details-btn mb-1" th:data-staff-id="${eval.staffId}">
+                                    <button class="btn btn-sm btn-info view-details-btn mb-1" th:attr="data-staff-id=${eval.staffId}">
                                         <i class="fas fa-eye"></i> View Tasks
                                     </button>
                                     <button class="btn btn-sm btn-primary evaluate-staff-btn mb-1"
-                                            th:data-staff-id="${eval.staffId}"
-                                            th:data-staff-name="${eval.staffName}">
+                                            th:attr="data-staff-id=${eval.staffId}, data-staff-name=${eval.staffName}">
                                         <i class="fas fa-star"></i> Evaluate
                                     </button>
                                     <button class="btn btn-sm btn-warning edit-evaluations-btn mb-1"
-                                            th:data-staff-id="${eval.staffId}"
-                                            th:data-staff-name="${eval.staffName}">
+                                            th:attr="data-staff-id=${eval.staffId}, data-staff-name=${eval.staffName}">
                                         <i class="fas fa-edit"></i> Edit
                                     </button>
                                 </td>
@@ -336,7 +339,8 @@
     </div>
 </div>
 
-<!-- View Details Modal - With Recent Evaluations -->
+<!-- Rest of your modals remain the same -->
+<!-- View Details Modal -->
 <div class="modal fade" id="detailsModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -357,7 +361,7 @@
     </div>
 </div>
 
-<!-- Create Evaluation Modal - With Multi-Select Dropdown -->
+<!-- Create Evaluation Modal -->
 <div class="modal fade" id="createEvaluationModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -456,11 +460,9 @@
     let selectedTasks = [];
     let isEditMode = false;
     let currentEvaluationId = null;
-
-    // Store all departments with their branch IDs
+    let currentEditingTaskId = null;
     let allDepartments = [];
 
-    // Initialize departments data from Thymeleaf
     function initDepartments() {
         const deptSelect = document.getElementById('deptSelect');
         const options = deptSelect.querySelectorAll('option');
@@ -475,27 +477,19 @@
         });
     }
 
-    // Filter departments based on selected branch
     function filterDepartmentsByBranch() {
         const branchSelect = document.getElementById('branchSelect');
         const deptSelect = document.getElementById('deptSelect');
         const selectedBranchId = branchSelect.value;
-
-        // Clear current options
         deptSelect.innerHTML = '<option value="">All Departments</option>';
-
-        // Filter and add departments
         let filteredDepts = allDepartments;
         if (selectedBranchId) {
             filteredDepts = allDepartments.filter(dept => dept.branchId === selectedBranchId);
         }
-
-        // Add filtered departments
         filteredDepts.forEach(dept => {
             const option = document.createElement('option');
             option.value = dept.id;
             option.textContent = dept.name;
-            // Preselect if this matches the selectedDepartment from server
             if ('${selectedDepartment != null}' && '${selectedDepartment}' == dept.id) {
                 option.selected = true;
             }
@@ -504,11 +498,23 @@
     }
 
     function updateEligibleCount() {
-        let total = document.querySelectorAll('.evaluate-staff-btn').length;
+        const total = document.querySelectorAll('.evaluate-staff-btn').length;
         document.getElementById('eligibleCount').textContent = total;
     }
 
-    // View details button handlers
+    function formatScore(score) {
+        if (!score && score !== 0) return '0%';
+        return Math.round(score) + '%';
+    }
+
+    function getScoreClass(score) {
+        if (!score && score !== 0) return 'bg-secondary';
+        if (score >= 70) return 'bg-success';
+        if (score >= 50) return 'bg-warning';
+        return 'bg-danger';
+    }
+
+    // Event listeners
     document.querySelectorAll('.view-details-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             const staffId = this.getAttribute('data-staff-id');
@@ -516,7 +522,6 @@
         });
     });
 
-    // Evaluate staff button handlers
     document.querySelectorAll('.evaluate-staff-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             const staffId = this.getAttribute('data-staff-id');
@@ -525,7 +530,6 @@
         });
     });
 
-    // Edit evaluations button handlers
     document.querySelectorAll('.edit-evaluations-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             const staffId = this.getAttribute('data-staff-id');
@@ -541,27 +545,38 @@
         selectedTasks = [];
 
         if (isEdit && evaluationData) {
+            // EDIT MODE
             document.querySelector('#createEvaluationModal .modal-title').innerHTML = 'Edit Evaluation';
             document.getElementById('submitBtn').innerHTML = 'Update Evaluation';
             document.getElementById('editModeInfo').style.display = 'block';
             currentEvaluationId = evaluationData.evaluationId;
+            currentEditingTaskId = evaluationData.taskId;
+
+            // Pre-fill form
             document.getElementById('score').value = evaluationData.score || '';
             document.getElementById('remarks').value = evaluationData.remarks || '';
             document.getElementById('year').value = evaluationData.year || new Date().getFullYear();
             document.getElementById('quarter').value = evaluationData.quarter || (Math.floor(new Date().getMonth() / 3) + 1);
-            selectedTasks = [evaluationData.taskId];
-            loadTasksForStaff(staffId, evaluationData.taskId);
+
+            // For edit mode, we only allow editing ONE task (the one being edited)
+            selectedTasks = [evaluationData.taskId.toString()];
+            loadTasksForStaff(staffId, evaluationData.taskId, true);
         } else {
+            // CREATE MODE
             document.querySelector('#createEvaluationModal .modal-title').innerHTML = 'Evaluate Staff Performance';
             document.getElementById('submitBtn').innerHTML = 'Submit Evaluation';
             document.getElementById('editModeInfo').style.display = 'none';
             currentEvaluationId = null;
+            currentEditingTaskId = null;
+
+            // Reset form
             document.getElementById('score').value = '';
             document.getElementById('remarks').value = '';
             const now = new Date();
             document.getElementById('year').value = now.getFullYear();
             document.getElementById('quarter').value = Math.floor(now.getMonth() / 3) + 1;
-            loadTasksForStaff(staffId, null);
+
+            loadTasksForStaff(staffId, null, false);
         }
         new bootstrap.Modal(document.getElementById('createEvaluationModal')).show();
     }
@@ -578,7 +593,7 @@
         }
     }
 
-    function loadTasksForStaff(staffId, preselectedTaskId) {
+    function loadTasksForStaff(staffId, preselectedTaskId, isEditModeFlag) {
         const tasksListDiv = document.getElementById('tasksCheckboxList');
         tasksListDiv.innerHTML = '<div class="text-center text-muted p-3"><div class="loading-spinner"></div> Loading tasks...</div>';
 
@@ -607,10 +622,14 @@
                             selectedTasks.push(task.taskId.toString());
                         }
 
+                        // In edit mode, disable the checkbox for tasks not being edited
+                        const isDisabled = isEditModeFlag && preselectedTaskId && preselectedTaskId != task.taskId;
+                        const disabledAttr = isDisabled ? 'disabled' : '';
+
                         html += `
                             <div class="dropdown-item-checkbox">
-                                <input type="checkbox" class="task-checkbox" value="${task.taskId}" id="task_${task.taskId}" ${isChecked ? 'checked' : ''}>
-                                <label for="task_${task.taskId}">
+                                <input type="checkbox" class="task-checkbox" value="${task.taskId}" id="task_${task.taskId}" ${isChecked ? 'checked' : ''} ${disabledAttr}>
+                                <label for="task_${task.taskId}" ${isDisabled ? 'style="opacity:0.6;"' : ''}>
                                     <span class="${statusClass}">${statusIcon}</span>
                                     <strong>${escapeHtml(displayText)}</strong>
                                     <span class="badge ${status === 'COMPLETED' ? 'bg-success' : (status === 'IN_PROGRESS' ? 'bg-primary' : (status === 'PENDING_REVIEW' ? 'bg-warning' : 'bg-secondary'))} task-status-badge-small">${status}</span>
@@ -619,9 +638,14 @@
                             </div>
                         `;
                     });
+
+                    if (isEditModeFlag) {
+                        html += '<div class="text-muted text-center p-2 mt-2"><small><i class="fas fa-info-circle"></i> In edit mode, you can only edit the selected task.</small></div>';
+                    }
+
                     tasksListDiv.innerHTML = html;
 
-                    document.querySelectorAll('.task-checkbox').forEach(cb => {
+                    document.querySelectorAll('.task-checkbox:not([disabled])').forEach(cb => {
                         cb.addEventListener('change', function() {
                             if (this.checked) {
                                 if (!selectedTasks.includes(this.value)) selectedTasks.push(this.value);
@@ -655,19 +679,25 @@
     });
 
     document.getElementById('selectAllTasksBtn').addEventListener('click', function() {
-        document.querySelectorAll('.task-checkbox').forEach(cb => {
-            cb.checked = true;
-            if (!selectedTasks.includes(cb.value)) selectedTasks.push(cb.value);
-        });
-        updateDropdownDisplay();
+        if (!isEditMode) {
+            document.querySelectorAll('.task-checkbox:not([disabled])').forEach(cb => {
+                cb.checked = true;
+                if (!selectedTasks.includes(cb.value)) selectedTasks.push(cb.value);
+            });
+            updateDropdownDisplay();
+        } else {
+            Swal.fire('Info', 'In edit mode, you can only edit the selected task', 'info');
+        }
     });
 
     document.getElementById('deselectAllTasksBtn').addEventListener('click', function() {
-        document.querySelectorAll('.task-checkbox').forEach(cb => {
-            cb.checked = false;
-            selectedTasks = [];
-        });
-        updateDropdownDisplay();
+        if (!isEditMode) {
+            document.querySelectorAll('.task-checkbox:not([disabled])').forEach(cb => {
+                cb.checked = false;
+                selectedTasks = [];
+            });
+            updateDropdownDisplay();
+        }
     });
 
     function loadEvaluationsForEdit(staffId, staffName) {
@@ -683,14 +713,15 @@
                 } else {
                     let html = `<h5 class="mb-3">Evaluations for ${escapeHtml(staffName)}</h5>`;
                     evaluations.forEach(eval => {
+                        const scoreValue = eval.score || 0;
                         html += `
                             <div class="evaluation-card">
                                 <div class="row">
                                     <div class="col-md-3"><strong>Task:</strong><br><small class="text-muted">${escapeHtml(eval.taskCode || 'N/A')}</small></div>
-                                    <div class="col-md-2"><strong>Score:</strong><br><span class="badge ${eval.score >= 70 ? 'bg-success' : (eval.score >= 50 ? 'bg-warning' : 'bg-danger')}">${eval.score}%</span></div>
+                                    <div class="col-md-2"><strong>Score:</strong><br><span class="badge ${getScoreClass(scoreValue)}">${formatScore(scoreValue)}</span></div>
                                     <div class="col-md-2"><strong>Quarter:</strong><br>Q${eval.quarter} ${eval.year}</div>
-                                    <div class="col-md-3"><strong>Date:</strong><br>${new Date(eval.evaluationDate).toLocaleDateString()}</div>
-                                    <div class="col-md-2"><button class="btn btn-sm btn-primary edit-single-evaluation" data-evaluation-id="${eval.evaluationId}" data-staff-id="${staffId}" data-staff-name="${escapeHtml(staffName)}" data-task-id="${eval.taskId}" data-score="${eval.score}" data-remarks="${escapeHtml(eval.remarks)}" data-year="${eval.year}" data-quarter="${eval.quarter}"><i class="fas fa-edit"></i> Edit</button></div>
+                                    <div class="col-md-3"><strong>Date:</strong><br>${eval.evaluationDate ? new Date(eval.evaluationDate).toLocaleDateString() : 'N/A'}</div>
+                                    <div class="col-md-2"><button class="btn btn-sm btn-primary edit-single-evaluation" data-evaluation-id="${eval.evaluationId}" data-staff-id="${staffId}" data-staff-name="${escapeHtml(staffName)}" data-task-id="${eval.taskId}" data-score="${eval.score || ''}" data-remarks="${escapeHtml(eval.remarks || '')}" data-year="${eval.year}" data-quarter="${eval.quarter}"><i class="fas fa-edit"></i> Edit</button></div>
                                 </div>
                                 <div class="row mt-2"><div class="col-12"><strong>Remarks:</strong><br><small>${escapeHtml(eval.remarks || '-')}</small></div></div>
                             </div>
@@ -699,17 +730,27 @@
                     contentDiv.innerHTML = html;
                     document.querySelectorAll('.edit-single-evaluation').forEach(btn => {
                         btn.addEventListener('click', function() {
-                            const evaluationData = { evaluationId: this.getAttribute('data-evaluation-id'), taskId: this.getAttribute('data-task-id'), score: this.getAttribute('data-score'), remarks: this.getAttribute('data-remarks'), year: this.getAttribute('data-year'), quarter: this.getAttribute('data-quarter') };
-                            const staffId = this.getAttribute('data-staff-id');
-                            const staffName = this.getAttribute('data-staff-name');
+                            const evaluationData = {
+                                evaluationId: this.getAttribute('data-evaluation-id'),
+                                taskId: this.getAttribute('data-task-id'),
+                                score: this.getAttribute('data-score'),
+                                remarks: this.getAttribute('data-remarks'),
+                                year: this.getAttribute('data-year'),
+                                quarter: this.getAttribute('data-quarter')
+                            };
+                            const staffIdAttr = this.getAttribute('data-staff-id');
+                            const staffNameAttr = this.getAttribute('data-staff-name');
                             bootstrap.Modal.getInstance(document.getElementById('editEvaluationsModal')).hide();
-                            openEvaluationModal(staffId, staffName, true, evaluationData);
+                            openEvaluationModal(staffIdAttr, staffNameAttr, true, evaluationData);
                         });
                     });
                 }
                 new bootstrap.Modal(document.getElementById('editEvaluationsModal')).show();
             })
-            .catch(error => { contentDiv.innerHTML = '<div class="alert alert-danger">Failed to load evaluations.</div>'; });
+            .catch(error => {
+                console.error('Error:', error);
+                contentDiv.innerHTML = '<div class="alert alert-danger">Failed to load evaluations. Please try again.</div>';
+            });
     }
 
     function viewDetails(staffId) {
@@ -730,6 +771,9 @@
                     }
                 }
 
+                const avgScore = data.averageScore || 0;
+                const completionRate = data.completionRate || 0;
+
                 currentDetailsHtml = `
                     <div class="print-area">
                         <div class="row mb-3">
@@ -739,24 +783,26 @@
                         <hr>
                         <h5>Performance Summary</h5>
                         <div class="row mb-3">
-                            <div class="col-md-3"><div class="card bg-light"><div class="card-body text-center"><h6>Total Tasks</h6><h3>${data.totalTasks}</h3></div></div></div>
-                            <div class="col-md-3"><div class="card bg-light"><div class="card-body text-center"><h6>Completed</h6><h3>${data.completedTasks}</h3></div></div></div>
-                            <div class="col-md-3"><div class="card bg-light"><div class="card-body text-center"><h6>Completion Rate</h6><h3>${data.completionRate}%</h3></div></div></div>
-                            <div class="col-md-3"><div class="card bg-light"><div class="card-body text-center"><h6>Avg Score</h6><h3>${data.averageScore}%</h3></div></div></div>
+                            <div class="col-md-3"><div class="card bg-light"><div class="card-body text-center"><h6>Total Tasks</h6><h3>${data.totalTasks || 0}</h3></div></div></div>
+                            <div class="col-md-3"><div class="card bg-light"><div class="card-body text-center"><h6>Completed</h6><h3>${data.completedTasks || 0}</h3></div></div></div>
+                            <div class="col-md-3"><div class="card bg-light"><div class="card-body text-center"><h6>Completion Rate</h6><h3>${Math.round(completionRate)}%</h3></div></div></div>
+                            <div class="col-md-3"><div class="card bg-light"><div class="card-body text-center"><h6>Avg Score</h6><h3>${Math.round(avgScore)}%</h3></div></div></div>
                         </div>
                         <h5>All Tasks with Status</h5>
                         <div class="table-responsive"><table class="table table-bordered"><thead class="table-dark"><tr><th>Task Code</th><th>Description</th><th>Status</th><th>Due Date</th><th>Evaluation Score</th><th>Remarks</th></tr></thead>
-                        <tbody>${(data.taskDetails || []).map(t => `<tr><td>${escapeHtml(t.taskCode || '-')}</td><td>${escapeHtml(t.taskTitle || t.taskDescription || '-')}</td><td><span class="badge ${getStatusBadgeClass(t.status)}">${escapeHtml(t.status)}</span></td><td>${t.dueDate ? new Date(t.dueDate).toLocaleDateString() : '-'}</td><td>${t.score ? t.score + '%' : 'Not Evaluated'}</td><td>${escapeHtml(t.remarks || '-')}</td>`).join('')}${(data.taskDetails || []).length === 0 ? '<tr><td colspan="6" class="text-center">No tasks assigned</td></tr>' : ''}</tbody></table></div>
+                        <tbody>${(data.taskDetails || []).map(t => `<tr><td>${escapeHtml(t.taskCode || '-')}</td><td>${escapeHtml(t.taskTitle || t.taskDescription || '-')}</td><td><span class="badge ${getStatusBadgeClass(t.status)}">${escapeHtml(t.status)}</span></td><td>${t.dueDate ? new Date(t.dueDate).toLocaleDateString() : '-'}</td><td>${t.score ? Math.round(t.score) + '%' : 'Not Evaluated'}</td><td>${escapeHtml(t.remarks || '-')}</td>`).join('')}${(data.taskDetails || []).length === 0 ? '<tr><td colspan="6" class="text-center">No tasks assigned</td></tr>' : ''}</tbody>}</table></div>
                         <h5 class="mt-4">Recent Evaluations</h5>
                         <div class="table-responsive"><table class="table table-sm table-bordered"><thead><tr><th>Code</th><th>Score</th><th>Quarter</th><th>Date</th><th>Remarks</th></tr></thead>
-                        <tbody>${(data.recentEvaluations || []).map(e => `<tr><td>${escapeHtml(e.evaluationCode)}</td><td>${e.score}%</td><td>Q${e.quarter} ${e.year}</td><td>${new Date(e.evaluationDate).toLocaleDateString()}</td><td>${escapeHtml(e.remarks || '-')}</td></tr>`).join('')}${(data.recentEvaluations || []).length === 0 ? '<tr><td colspan="5" class="text-center">No evaluations yet</td></tr>' : ''}</tbody></table></div>
-                        <div class="alert alert-info mt-3"><strong>Performance Level:</strong> ${escapeHtml(data.performanceLevel)}</div>
+                        <tbody>${(data.recentEvaluations || []).map(e => `<tr><td>${escapeHtml(e.evaluationCode)}</td><td>${e.score ? Math.round(e.score) + '%' : 'N/A'}</td><td>Q${e.quarter} ${e.year}</td><td>${e.evaluationDate ? new Date(e.evaluationDate).toLocaleDateString() : '-'}</td><td>${escapeHtml(e.remarks || '-')}</td></tr>`).join('')}${(data.recentEvaluations || []).length === 0 ? '<tr><td colspan="5" class="text-center">No evaluations yet</td></tr>' : ''}</tbody></table></div>
+                        <div class="alert alert-info mt-3"><strong>Performance Level:</strong> ${escapeHtml(data.performanceLevel || 'Not Evaluated')}</div>
                     </div>
                 `;
                 document.getElementById('detailsContent').innerHTML = currentDetailsHtml;
                 new bootstrap.Modal(document.getElementById('detailsModal')).show();
             })
-            .catch(error => { Swal.fire('Error', 'Failed to load staff details: ' + error.message, 'error'); });
+            .catch(error => {
+                Swal.fire('Error', 'Failed to load staff details: ' + error.message, 'error');
+            });
     }
 
     function escapeHtml(text) {
@@ -773,18 +819,55 @@
     }
 
     document.getElementById('resetFormBtn').addEventListener('click', function() {
-        document.getElementById('score').value = '';
-        document.getElementById('remarks').value = '';
-        document.querySelectorAll('.task-checkbox').forEach(cb => { cb.checked = false; });
-        selectedTasks = [];
-        updateDropdownDisplay();
-        const now = new Date();
-        document.getElementById('year').value = now.getFullYear();
-        document.getElementById('quarter').value = Math.floor(now.getMonth() / 3) + 1;
-        Swal.fire('Reset', 'Form has been reset', 'info');
+        if (isEditMode && currentEvaluationId) {
+            Swal.fire({
+                title: 'Reset Form?',
+                text: 'This will clear your changes but keep the evaluation. Continue?',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Yes, reset',
+                cancelButtonText: 'No, stay'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Reload the evaluation data from the server
+                    const staffId = document.getElementById('staffId').value;
+                    fetch(`/admin/staff-evaluations/${staffId}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            const evaluation = (data.recentEvaluations || []).find(e => e.evaluationId == currentEvaluationId);
+                            if (evaluation) {
+                                document.getElementById('score').value = evaluation.score || '';
+                                document.getElementById('remarks').value = evaluation.remarks || '';
+                                document.getElementById('year').value = evaluation.year || new Date().getFullYear();
+                                document.getElementById('quarter').value = evaluation.quarter || (Math.floor(new Date().getMonth() / 3) + 1);
+                                Swal.fire('Reset', 'Form has been reset to original values', 'info');
+                            }
+                        })
+                        .catch(error => {
+                            Swal.fire('Error', 'Failed to reset form', 'error');
+                        });
+                }
+            });
+        } else {
+            document.getElementById('score').value = '';
+            document.getElementById('remarks').value = '';
+            document.querySelectorAll('.task-checkbox:not([disabled])').forEach(cb => {
+                cb.checked = false;
+            });
+            selectedTasks = [];
+            updateDropdownDisplay();
+            const now = new Date();
+            document.getElementById('year').value = now.getFullYear();
+            document.getElementById('quarter').value = Math.floor(now.getMonth() / 3) + 1;
+            Swal.fire('Reset', 'Form has been reset', 'info');
+        }
     });
 
     document.getElementById('createEvaluationModal').addEventListener('hidden.bs.modal', function() {
+        // Reset all variables when modal closes
+        isEditMode = false;
+        currentEvaluationId = null;
+        currentEditingTaskId = null;
         document.getElementById('staffId').value = '';
         document.getElementById('staffNameDisplay').value = '';
         document.getElementById('score').value = '';
@@ -802,7 +885,6 @@
         Swal.fire('Success', 'Report exported successfully', 'success');
     });
 
-    // Add branch change listener for dependent dropdown
     document.getElementById('branchSelect').addEventListener('change', function() {
         filterDepartmentsByBranch();
     });
@@ -816,41 +898,98 @@
         const year = document.getElementById('year').value;
         const quarter = document.getElementById('quarter').value;
 
-        if (!staffId) { Swal.fire('Error', 'Please select a staff member', 'error'); return; }
-        if (selectedTasks.length === 0) { Swal.fire('Error', 'Please select at least one task to evaluate', 'error'); return; }
-        if (!remarks || remarks.trim() === '') { Swal.fire('Error', 'Remarks are required for evaluation', 'error'); return; }
+        if (!staffId) {
+            Swal.fire('Error', 'Please select a staff member', 'error');
+            return;
+        }
+        if (selectedTasks.length === 0) {
+            Swal.fire('Error', 'Please select at least one task to evaluate', 'error');
+            return;
+        }
+        if (!remarks || remarks.trim() === '') {
+            Swal.fire('Error', 'Remarks are required for evaluation', 'error');
+            return;
+        }
 
         const submitBtn = e.target.querySelector('button[type="submit"]');
         const originalText = submitBtn.innerHTML;
         submitBtn.disabled = true;
-        submitBtn.innerHTML = '<span class="loading-spinner"></span> Submitting...';
+        submitBtn.innerHTML = '<span class="loading-spinner"></span> Processing...';
 
-        let successCount = 0, errorCount = 0;
-        for (const taskId of selectedTasks) {
+        let successCount = 0;
+        let errorCount = 0;
+
+        if (isEditMode && currentEvaluationId) {
+            // UPDATE MODE - Only update the single evaluation being edited
+            const taskId = selectedTasks[0]; // In edit mode, only one task should be selected
             const formData = new URLSearchParams();
-            formData.append('staffId', staffId);
-            formData.append('taskId', taskId);
-            if (score) formData.append('score', score);
+            formData.append('score', score);
             formData.append('remarks', remarks);
-            formData.append('year', year);
-            formData.append('quarter', quarter);
+
             try {
-                const response = await fetch('/admin/staff-evaluations/create', { method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: formData });
+                const response = await fetch(`/admin/staff-evaluations/${currentEvaluationId}?score=${encodeURIComponent(score || '')}&remarks=${encodeURIComponent(remarks)}`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'}
+                });
                 const result = await response.json();
-                if (result.success) successCount++; else errorCount++;
-            } catch (error) { errorCount++; }
+                if (result.success) {
+                    successCount++;
+                } else {
+                    errorCount++;
+                    console.error('Update failed:', result.message);
+                    Swal.fire('Error', result.message || 'Failed to update evaluation', 'error');
+                }
+            } catch (error) {
+                errorCount++;
+                console.error('Error updating evaluation:', error);
+                Swal.fire('Error', 'Network error while updating evaluation', 'error');
+            }
+        } else {
+            // CREATE MODE - Create multiple evaluations
+            for (const taskId of selectedTasks) {
+                const formData = new URLSearchParams();
+                formData.append('staffId', staffId);
+                formData.append('taskId', taskId);
+                if (score) formData.append('score', score);
+                formData.append('remarks', remarks);
+                formData.append('year', year);
+                formData.append('quarter', quarter);
+                try {
+                    const response = await fetch('/admin/staff-evaluations/create', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                        body: formData
+                    });
+                    const result = await response.json();
+                    if (result.success) {
+                        successCount++;
+                    } else {
+                        errorCount++;
+                        console.error('Create failed for task:', taskId, result.message);
+                    }
+                } catch (error) {
+                    errorCount++;
+                    console.error('Error creating evaluation for task:', taskId, error);
+                }
+            }
         }
 
         submitBtn.disabled = false;
         submitBtn.innerHTML = originalText;
+
         if (successCount > 0) {
-            Swal.fire('Success', `Evaluated ${successCount} task(s) successfully. ${errorCount > 0 ? errorCount + ' failed.' : ''}`, 'success').then(() => location.reload());
+            const message = isEditMode ?
+                'Evaluation updated successfully!' :
+                `${successCount} task(s) evaluated successfully.${errorCount > 0 ? ' ' + errorCount + ' failed.' : ''}`;
+            Swal.fire('Success', message, 'success').then(() => location.reload());
         } else {
-            Swal.fire('Error', 'Failed to create evaluations', 'error');
+            if (!isEditMode) {
+                Swal.fire('Error', 'Failed to create evaluations. Please try again.', 'error');
+            }
         }
     });
 
-    // Initialize dependent dropdowns
+    // Initialize
     initDepartments();
     filterDepartmentsByBranch();
     updateEligibleCount();

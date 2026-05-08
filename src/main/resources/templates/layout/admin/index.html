@@ -51,9 +51,24 @@
             border: none;
             margin-bottom: 20px;
             color: white;
+            min-height: 130px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .stats-card:hover { transform: translateY(-5px); }
+
+        .stats-card .card-body {
+            padding: 1rem;
+            text-align: center;
+            width: 100%;
+        }
+
+        .stats-card h3 {
+            font-size: 1.8rem;
+            margin: 5px 0;
+        }
 
         .stats-card.staff { background: linear-gradient(135deg, var(--deep-navy), #2a3f8a); }
         .stats-card.supervisors { background: linear-gradient(135deg, var(--vibrant-orange), #ff8c42); }
@@ -151,6 +166,25 @@
             text-overflow: ellipsis;
             display: inline-block;
         }
+
+        .branch-group {
+            margin-bottom: 30px;
+        }
+
+        .branch-header {
+            background: linear-gradient(135deg, var(--deep-navy), #2a3f8a);
+            color: white;
+            padding: 12px 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+
+        .branch-header h5 {
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
     </style>
 </head>
 
@@ -187,6 +221,9 @@
             </a>
             <a th:href="@{/dashboard/supervisors}" class="list-group-item list-group-item-action">
                 🧑‍💼 Supervisor Management
+            </a>
+            <a th:href="@{/role-management}" class="list-group-item list-group-item-action">
+                🧑‍💼 Assign Role Management
             </a>
             <a th:href="@{/admin/pending-approvals}" class="list-group-item list-group-item-action">
                 ✅ Pending Approvals
@@ -242,11 +279,11 @@
             </div>
         </div>
 
-        <!-- Statistics Cards -->
+        <!-- Statistics Cards - Uniform Size -->
         <div class="row">
             <div class="col-md-2">
                 <div class="stats-card staff" onclick="window.location.href='/admin/staff'">
-                    <div class="card-body text-center">
+                    <div class="card-body">
                         <i class="fas fa-users fa-2x mb-2"></i>
                         <h3 th:text="${statistics.totalStaff}">0</h3>
                         <p class="mb-0">Total Staff</p>
@@ -255,7 +292,7 @@
             </div>
             <div class="col-md-2">
                 <div class="stats-card supervisors" onclick="window.location.href='/dashboard/supervisors'">
-                    <div class="card-body text-center">
+                    <div class="card-body">
                         <i class="fas fa-user-tie fa-2x mb-2"></i>
                         <h3 th:text="${statistics.totalSupervisors}">0</h3>
                         <p class="mb-0">Supervisors</p>
@@ -264,7 +301,7 @@
             </div>
             <div class="col-md-2">
                 <div class="stats-card branches" onclick="window.location.href='/dashboard/branches'">
-                    <div class="card-body text-center">
+                    <div class="card-body">
                         <i class="fas fa-code-branch fa-2x mb-2"></i>
                         <h3 th:text="${statistics.totalBranches}">0</h3>
                         <p class="mb-0">Branches</p>
@@ -273,7 +310,7 @@
             </div>
             <div class="col-md-2">
                 <div class="stats-card departments" onclick="window.location.href='/dashboard/departments'">
-                    <div class="card-body text-center">
+                    <div class="card-body">
                         <i class="fas fa-building fa-2x mb-2"></i>
                         <h3 th:text="${statistics.totalDepartments}">0</h3>
                         <p class="mb-0">Departments</p>
@@ -282,7 +319,7 @@
             </div>
             <div class="col-md-2">
                 <div class="stats-card tasks" onclick="window.location.href='/dashboard/tasks'">
-                    <div class="card-body text-center">
+                    <div class="card-body">
                         <i class="fas fa-tasks fa-2x mb-2"></i>
                         <h3 th:text="${statistics.totalTasks}">0</h3>
                         <p class="mb-0">Total Tasks</p>
@@ -291,7 +328,7 @@
             </div>
             <div class="col-md-2">
                 <div class="stats-card approved" onclick="window.location.href='/dashboard/tasks?status=APPROVED'">
-                    <div class="card-body text-center">
+                    <div class="card-body">
                         <i class="fas fa-check-circle fa-2x mb-2"></i>
                         <h3 th:text="${statistics.approvedTasks}">0</h3>
                         <p class="mb-0">Approved</p>
@@ -300,9 +337,8 @@
             </div>
         </div>
 
-        <!-- ✅ Task Status Breakdown - MATCHES YOUR AdminStatistics EXACTLY -->
+        <!-- Task Status Breakdown -->
         <div class="row">
-            <!-- Assigned -->
             <div class="col-md-2">
                 <div class="stats-card" style="background: linear-gradient(135deg, var(--vibrant-orange), #ff8c42);"
                      onclick="window.location.href='/dashboard/tasks?status=ASSIGNED'">
@@ -313,7 +349,6 @@
                     </div>
                 </div>
             </div>
-            <!-- In Progress (INITIATED + IN_PROGRESS) -->
             <div class="col-md-2">
                 <div class="stats-card" style="background: linear-gradient(135deg, var(--soft-orange), #ffb347);"
                      onclick="window.location.href='/dashboard/tasks?status=INITIATED,IN_PROGRESS'">
@@ -321,11 +356,9 @@
                         <i class="fas fa-spinner fa-2x mb-2"></i>
                         <h3 th:text="${statistics.inProgressTasks}">0</h3>
                         <p class="mb-0">In Progress</p>
-                        <small class="text-white-50">Initiated & Working</small>
                     </div>
                 </div>
             </div>
-            <!-- Completed -->
             <div class="col-md-2">
                 <div class="stats-card" style="background: linear-gradient(135deg, #27ae60, #2ECC71);"
                      onclick="window.location.href='/dashboard/tasks?status=COMPLETED'">
@@ -336,7 +369,6 @@
                     </div>
                 </div>
             </div>
-            <!-- Pending Review -->
             <div class="col-md-2">
                 <div class="stats-card" style="background: linear-gradient(135deg, var(--warning-yellow), #f39c12); color: #333;"
                      onclick="window.location.href='/dashboard/tasks?status=PENDING_REVIEW'">
@@ -347,7 +379,6 @@
                     </div>
                 </div>
             </div>
-            <!-- Pending Approval -->
             <div class="col-md-2">
                 <div class="stats-card pending" onclick="window.location.href='/admin/pending-approvals'">
                     <div class="card-body text-center">
@@ -357,7 +388,6 @@
                     </div>
                 </div>
             </div>
-            <!-- Rejected -->
             <div class="col-md-2">
                 <div class="stats-card" style="background: linear-gradient(135deg, var(--error-red), #c0392b);"
                      onclick="window.location.href='/dashboard/tasks?status=REJECTED'">
@@ -381,7 +411,7 @@
                             <tr>
                                 <th>Branch</th>
                                 <th>Total Tasks</th>
-                                <th>Completed</th>
+                                <th>Completed (Approved)</th>
                                 <th>Completion Rate</th>
                                 <th>Performance</th>
                             </tr>
@@ -390,6 +420,7 @@
                             <tr th:each="branch : ${branchPerformance}">
                                 <td><strong th:text="${branch.branchName}">Accra</strong></td>
                                 <td th:text="${branch.totalTasks}">0</td>
+                                <!-- Completed includes APPROVED tasks -->
                                 <td th:text="${branch.completedTasks}">0</td>
                                 <td>
                                     <span th:text="${#numbers.formatDecimal(branch.completionRate, 1, 1) + '%'}">0%</span>
@@ -414,45 +445,60 @@
             </div>
         </div>
 
-        <!-- Department Performance -->
+        <!-- Department Performance by Branch -->
         <div class="row">
             <div class="col-12">
                 <div class="table-card">
-                    <h5 class="chart-title"><i class="fas fa-trophy"></i> Department Performance</h5>
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                            <tr>
-                                <th>Department</th>
-                                <th>Total Tasks</th>
-                                <th>Completed</th>
-                                <th>Completion Rate</th>
-                                <th>Performance</th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            <tr th:each="dept : ${departmentPerformance}">
-                                <td><strong th:text="${dept.departmentName}">ICT</strong></td>
-                                <td th:text="${dept.totalTasks}">0</td>
-                                <td th:text="${dept.completedTasks}">0</td>
-                                <td>
-                                    <span th:text="${#numbers.formatDecimal(dept.completionRate, 1, 1) + '%'}">0%</span>
-                                    <div class="performance-bar">
-                                        <div class="performance-fill"
-                                             th:style="'width:' + ${dept.completionRate} + '%'"
-                                             th:classappend="${dept.completionRate >= 70} ? 'bg-success' : (${dept.completionRate >= 40} ? 'bg-warning' : 'bg-danger')"></div>
-                                    </div>
-                                </td>
-                                <td>
-                                    <span th:classappend="${dept.completionRate >= 70} ? 'performance-high' : (${dept.completionRate >= 40} ? 'performance-medium' : 'performance-low')"
-                                          th:text="${dept.completionRate >= 70} ? 'Excellent' : (${dept.completionRate >= 40} ? 'Average' : 'Needs Improvement')">Excellent</span>
-                                </td>
-                            </tr>
-                            <tr th:if="${departmentPerformance == null || departmentPerformance.isEmpty()}">
-                                <td colspan="5" class="text-center">No department data available</td>
-                            </tr>
-                            </tbody>
-                        </table>
+                    <h5 class="chart-title"><i class="fas fa-trophy"></i> Department Performance by Branch</h5>
+                    <div th:if="${departmentPerformanceByBranch != null and !departmentPerformanceByBranch.isEmpty()}">
+                        <div th:each="branchEntry : ${departmentPerformanceByBranch}">
+                            <div class="branch-group">
+                                <div class="branch-header">
+                                    <h5>
+                                        <i class="fas fa-building"></i>
+                                        <span th:text="${branchEntry.key}">Branch Name</span>
+                                    </h5>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                        <tr>
+                                            <th>Department</th>
+                                            <th>Total Tasks</th>
+                                            <th>Completed (Approved)</th>
+                                            <th>Completion Rate</th>
+                                            <th>Performance</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        <tr th:each="dept : ${branchEntry.value}">
+                                            <td><strong th:text="${dept.departmentName}">Department Name</strong></td>
+                                            <td th:text="${dept.totalTasks}">0</td>
+                                            <td th:text="${dept.completedTasks}">0</td>
+                                            <td>
+                                                <span th:text="${#numbers.formatDecimal(dept.completionRate, 1, 1) + '%'}">0%</span>
+                                                <div class="performance-bar">
+                                                    <div class="performance-fill"
+                                                         th:style="'width:' + ${dept.completionRate} + '%'"
+                                                         th:classappend="${dept.completionRate >= 70} ? 'bg-success' : (${dept.completionRate >= 40} ? 'bg-warning' : 'bg-danger')"></div>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                    <span th:classappend="${dept.completionRate >= 70} ? 'performance-high' : (${dept.completionRate >= 40} ? 'performance-medium' : 'performance-low')"
+                                                          th:text="${dept.completionRate >= 70} ? 'Excellent' : (${dept.completionRate >= 40} ? 'Average' : 'Needs Improvement')">Excellent</span>
+                                            </td>
+                                        </tr>
+                                        <tr th:if="${branchEntry.value == null || branchEntry.value.isEmpty()}">
+                                            <td colspan="5" class="text-center">No department data available</td>
+                                        </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div th:if="${departmentPerformanceByBranch == null or departmentPerformanceByBranch.isEmpty()}">
+                        <div class="alert alert-info text-center">No department performance data available</div>
                     </div>
                 </div>
             </div>
@@ -475,10 +521,6 @@
                     <label><i class="fas fa-filter"></i> Filter by Department:</label>
                     <select id="departmentFilter" class="form-select">
                         <option value="ALL">All Departments</option>
-                        <option th:each="dept : ${departments}"
-                                th:value="${dept.departmentId}"
-                                th:text="${dept.departmentName}"
-                                th:selected="${selectedDepartment != null && selectedDepartment == dept.departmentId}"></option>
                     </select>
                 </div>
                 <div class="col-md-3">
@@ -582,18 +624,83 @@
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
 
-<script>
+<script th:inline="javascript">
     $(document).ready(function() {
+        // Store all departments with their branch IDs
+        var allDepartments = [];
+        var departmentsData = /*[[${departments}]]*/ [];
+
+        // Build departments array
+        departmentsData.forEach(function(dept) {
+            allDepartments.push({
+                id: dept.departmentId,
+                name: dept.departmentName,
+                branchId: dept.branch ? dept.branch.branchId : ''
+            });
+        });
+
+        // Function to filter departments based on selected branch
+        function filterDepartments() {
+            var selectedBranchId = $('#branchFilter').val();
+            var currentDeptValue = $('#departmentFilter').val();
+
+            $('#departmentFilter').empty().append('<option value="ALL">All Departments</option>');
+
+            var filteredDepts = allDepartments;
+            if (selectedBranchId && selectedBranchId !== 'ALL') {
+                filteredDepts = allDepartments.filter(function(dept) {
+                    return dept.branchId == selectedBranchId;
+                });
+            }
+
+            filteredDepts.forEach(function(dept) {
+                $('#departmentFilter').append('<option value="' + dept.id + '">' + dept.name + '</option>');
+            });
+
+            // Restore selected department if it's still valid
+            if (currentDeptValue && currentDeptValue !== 'ALL') {
+                var stillExists = filteredDepts.some(function(d) { return d.id == currentDeptValue; });
+                if (stillExists) {
+                    $('#departmentFilter').val(currentDeptValue);
+                }
+            }
+        }
+
+        // Parse data from Thymeleaf
+        var staffDeptData = /*[[${staffByDepartment}]]*/ {};
+        var staffBranchData = /*[[${staffByBranch}]]*/ {};
+        var supervisorDeptData = /*[[${supervisorByDepartment}]]*/ {};
+
+        // Parse statistics
+        var statistics = {
+            pendingTasks: /*[[${statistics.pendingTasks}]]*/ 0,
+            inProgressTasks: /*[[${statistics.inProgressTasks}]]*/ 0,
+            completedTasks: /*[[${statistics.completedTasks}]]*/ 0,
+            pendingReviewTasks: /*[[${statistics.pendingReviewTasks}]]*/ 0,
+            pendingApprovalTasks: /*[[${statistics.pendingApprovalTasks}]]*/ 0,
+            approvedTasks: /*[[${statistics.approvedTasks}]]*/ 0,
+            rejectedTasks: /*[[${statistics.rejectedTasks}]]*/ 0
+        };
+
+        // Initialize Select2
         $('#branchFilter, #departmentFilter, #quarterFilter').select2({
             placeholder: 'Select...',
             allowClear: true,
             width: '100%'
         });
 
+        // When branch changes, update department dropdown
+        $('#branchFilter').on('change', function() {
+            filterDepartments();
+            $('#branchFilter').trigger('change.select2');
+        });
+
+        // Initial filter setup
+        filterDepartments();
+
         // Staff by Department Chart
-        const staffDeptData = /*[[${staffByDepartment}]]*/ {};
-        const staffDeptCtx = document.getElementById('staffDeptChart').getContext('2d');
-        if (Object.keys(staffDeptData).length > 0) {
+        var staffDeptCtx = document.getElementById('staffDeptChart').getContext('2d');
+        if (staffDeptData && Object.keys(staffDeptData).length > 0) {
             new Chart(staffDeptCtx, {
                 type: 'bar',
                 data: {
@@ -613,12 +720,17 @@
                     scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
                 }
             });
+        } else {
+            staffDeptCtx.fillStyle = '#f5f5f5';
+            staffDeptCtx.fillRect(0, 0, staffDeptCtx.canvas.width, staffDeptCtx.canvas.height);
+            staffDeptCtx.fillStyle = '#999';
+            staffDeptCtx.font = '14px Arial';
+            staffDeptCtx.fillText('No data available', staffDeptCtx.canvas.width/2 - 50, staffDeptCtx.canvas.height/2);
         }
 
         // Staff by Branch Chart
-        const staffBranchData = /*[[${staffByBranch}]]*/ {};
-        const staffBranchCtx = document.getElementById('staffBranchChart').getContext('2d');
-        if (Object.keys(staffBranchData).length > 0) {
+        var staffBranchCtx = document.getElementById('staffBranchChart').getContext('2d');
+        if (staffBranchData && Object.keys(staffBranchData).length > 0) {
             new Chart(staffBranchCtx, {
                 type: 'bar',
                 data: {
@@ -638,21 +750,27 @@
                     scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
                 }
             });
+        } else {
+            staffBranchCtx.fillStyle = '#f5f5f5';
+            staffBranchCtx.fillRect(0, 0, staffBranchCtx.canvas.width, staffBranchCtx.canvas.height);
+            staffBranchCtx.fillStyle = '#999';
+            staffBranchCtx.font = '14px Arial';
+            staffBranchCtx.fillText('No data available', staffBranchCtx.canvas.width/2 - 50, staffBranchCtx.canvas.height/2);
         }
 
-        // Task Status Chart - MATCHES YOUR STATISTICS EXACTLY
-        const taskStatusCtx = document.getElementById('taskStatusChart').getContext('2d');
-        const taskData = [
-            /*[[${statistics.pendingTasks}]]*/ 0,        // Assigned
-            /*[[${statistics.inProgressTasks}]]*/ 0,     // In Progress (Initiated + Working)
-            /*[[${statistics.completedTasks}]]*/ 0,      // Completed
-            /*[[${statistics.pendingReviewTasks}]]*/ 0,  // Pending Review
-            /*[[${statistics.pendingApprovalTasks}]]*/ 0, // Pending Approval
-            /*[[${statistics.approvedTasks}]]*/ 0,       // Approved
-            /*[[${statistics.rejectedTasks}]]*/ 0        // Rejected
+        // Task Status Chart
+        var taskStatusCtx = document.getElementById('taskStatusChart').getContext('2d');
+        var taskData = [
+            statistics.pendingTasks,
+            statistics.inProgressTasks,
+            statistics.completedTasks,
+            statistics.pendingReviewTasks,
+            statistics.pendingApprovalTasks,
+            statistics.approvedTasks,
+            statistics.rejectedTasks
         ];
 
-        if (taskData.some(val => val > 0)) {
+        if (taskData.some(function(val) { return val > 0; })) {
             new Chart(taskStatusCtx, {
                 type: 'doughnut',
                 data: {
@@ -669,12 +787,17 @@
                     plugins: { legend: { position: 'right', labels: { boxWidth: 15, padding: 10 } } }
                 }
             });
+        } else {
+            taskStatusCtx.fillStyle = '#f5f5f5';
+            taskStatusCtx.fillRect(0, 0, taskStatusCtx.canvas.width, taskStatusCtx.canvas.height);
+            taskStatusCtx.fillStyle = '#999';
+            taskStatusCtx.font = '14px Arial';
+            taskStatusCtx.fillText('No data available', taskStatusCtx.canvas.width/2 - 50, taskStatusCtx.canvas.height/2);
         }
 
         // Supervisors by Department Chart
-        const supervisorDeptData = /*[[${supervisorByDepartment}]]*/ {};
-        const supervisorDeptCtx = document.getElementById('supervisorDeptChart').getContext('2d');
-        if (Object.keys(supervisorDeptData).length > 0) {
+        var supervisorDeptCtx = document.getElementById('supervisorDeptChart').getContext('2d');
+        if (supervisorDeptData && Object.keys(supervisorDeptData).length > 0) {
             new Chart(supervisorDeptCtx, {
                 type: 'bar',
                 data: {
@@ -694,14 +817,20 @@
                     scales: { y: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 } } }
                 }
             });
+        } else {
+            supervisorDeptCtx.fillStyle = '#f5f5f5';
+            supervisorDeptCtx.fillRect(0, 0, supervisorDeptCtx.canvas.width, supervisorDeptCtx.canvas.height);
+            supervisorDeptCtx.fillStyle = '#999';
+            supervisorDeptCtx.font = '14px Arial';
+            supervisorDeptCtx.fillText('No data available', supervisorDeptCtx.canvas.width/2 - 50, supervisorDeptCtx.canvas.height/2);
         }
 
         // Filter buttons
         $('#applyFilterBtn').click(function() {
-            const branch = $('#branchFilter').val();
-            const department = $('#departmentFilter').val();
-            const quarter = $('#quarterFilter').val();
-            let url = '/admin/dashboard/filter?';
+            var branch = $('#branchFilter').val();
+            var department = $('#departmentFilter').val();
+            var quarter = $('#quarterFilter').val();
+            var url = '/admin/dashboard/filter?';
             if (branch && branch !== 'ALL') url += 'branchId=' + branch + '&';
             if (department && department !== 'ALL') url += 'deptId=' + department + '&';
             if (quarter && quarter !== 'ALL') url += 'quarter=' + quarter;

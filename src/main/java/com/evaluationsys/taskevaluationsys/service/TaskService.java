@@ -27,16 +27,113 @@ public class TaskService {
     private final TaskRepository taskRepository;
     private final SupervisorRepository supervisorRepository;
     private final UserRepository userRepository;
-    private final TaskAssignmentRepository assignmentRepository;  // ✅ ADD THIS
+    private final TaskAssignmentRepository assignmentRepository;
 
     public TaskService(TaskRepository taskRepository,
                        SupervisorRepository supervisorRepository,
                        UserRepository userRepository,
-                       TaskAssignmentRepository assignmentRepository) {  // ✅ ADD THIS
+                       TaskAssignmentRepository assignmentRepository) {
         this.taskRepository = taskRepository;
         this.supervisorRepository = supervisorRepository;
         this.userRepository = userRepository;
-        this.assignmentRepository = assignmentRepository;  // ✅ ADD THIS
+        this.assignmentRepository = assignmentRepository;
+    }
+
+    // ===============================
+    // Helper method to get current quarter based on date
+    // ===============================
+    private Quarter getCurrentQuarter(LocalDateTime date) {
+        int month = date.getMonthValue();
+        if (month >= 1 && month <= 3) return Quarter.Q1;
+        if (month >= 4 && month <= 6) return Quarter.Q2;
+        if (month >= 7 && month <= 9) return Quarter.Q3;
+        return Quarter.Q4;
+    }
+
+    // ===============================
+    // Helper method to get quarter start date
+    // ===============================
+    private LocalDateTime getQuarterStartDate(Quarter quarter, int year) {
+        return switch (quarter) {
+            case Q1 -> LocalDateTime.of(year, 1, 1, 0, 0, 0);
+            case Q2 -> LocalDateTime.of(year, 4, 1, 0, 0, 0);
+            case Q3 -> LocalDateTime.of(year, 7, 1, 0, 0, 0);
+            case Q4 -> LocalDateTime.of(year, 10, 1, 0, 0, 0);
+        };
+    }
+
+    // ===============================
+    // Helper method to get quarter end date
+    // ===============================
+    private LocalDateTime getQuarterEndDate(Quarter quarter, int year) {
+        return switch (quarter) {
+            case Q1 -> LocalDateTime.of(year, 3, 31, 23, 59, 59);
+            case Q2 -> LocalDateTime.of(year, 6, 30, 23, 59, 59);
+            case Q3 -> LocalDateTime.of(year, 9, 30, 23, 59, 59);
+            case Q4 -> LocalDateTime.of(year, 12, 31, 23, 59, 59);
+        };
+    }
+
+    // ===============================
+    // Helper method to get quarter date range string
+    // ===============================
+    private String getQuarterDateRange(Quarter quarter, int year) {
+        return switch (quarter) {
+            case Q1 -> String.format("Q1 (Jan 1 - Mar 31, %d)", year);
+            case Q2 -> String.format("Q2 (Apr 1 - Jun 30, %d)", year);
+            case Q3 -> String.format("Q3 (Jul 1 - Sep 30, %d)", year);
+            case Q4 -> String.format("Q4 (Oct 1 - Dec 31, %d)", year);
+        };
+    }
+
+    // ===============================
+    // STRICT VALIDATION: Only current quarter, deadline within quarter
+    // ===============================
+    private void validateStrictQuarterAndDeadline(LocalDateTime currentDate, TaskDTO dto) {
+        Quarter currentQuarter = getCurrentQuarter(currentDate);
+        Quarter taskQuarter = dto.getQuarter();
+        Integer taskYear = dto.getYear();
+        LocalDateTime deadline = dto.getDeadline();
+        int currentYear = currentDate.getYear();
+
+        // Rule 1: Can only create tasks for the current year
+        if (taskYear == null || !taskYear.equals(currentYear)) {
+            throw new IllegalArgumentException(
+                    String.format("❌ Tasks can only be created for the current year (%d). You selected year %d.",
+                            currentYear, taskYear)
+            );
+        }
+
+        // Rule 2: Can only create tasks for the current quarter
+        if (taskQuarter != currentQuarter) {
+            throw new IllegalArgumentException(
+                    String.format("❌ Tasks can only be created for the current quarter (%s - %s). You selected %s.",
+                            currentQuarter, getQuarterDateRange(currentQuarter, currentYear), taskQuarter)
+            );
+        }
+
+        // Rule 3: Deadline must be within the current quarter
+        LocalDateTime quarterStart = getQuarterStartDate(currentQuarter, currentYear);
+        LocalDateTime quarterEnd = getQuarterEndDate(currentQuarter, currentYear);
+
+        if (deadline == null) {
+            throw new IllegalArgumentException("❌ Task deadline is required");
+        }
+
+        if (deadline.isBefore(quarterStart) || deadline.isAfter(quarterEnd)) {
+            throw new IllegalArgumentException(
+                    String.format("❌ Deadline must be within the current quarter (%s): %s to %s. Your deadline: %s",
+                            currentQuarter,
+                            quarterStart.toLocalDate().toString(),
+                            quarterEnd.toLocalDate().toString(),
+                            deadline.toLocalDate().toString())
+            );
+        }
+
+        // Rule 4: Deadline cannot be in the past
+        if (deadline.isBefore(currentDate)) {
+            throw new IllegalArgumentException("❌ Deadline cannot be in the past");
+        }
     }
 
     // ===============================
@@ -66,18 +163,37 @@ public class TaskService {
     }
 
     // ===============================
-    // CREATE TASK
+    // CREATE TASK WITH STRICT VALIDATION
     // ===============================
     @Transactional
     public TaskDTOResponse createTask(TaskDTO dto) {
+        // Auto-set year to current year if not provided
+        LocalDateTime currentDate = LocalDateTime.now();
+        int currentYear = currentDate.getYear();
+        Quarter currentQuarter = getCurrentQuarter(currentDate);
+
+        if (dto.getYear() == null) {
+            dto.setYear(currentYear);
+        }
+
+        // Auto-set quarter to current quarter if not provided or force it
+        if (dto.getQuarter() == null) {
+            dto.setQuarter(currentQuarter);
+        }
+
+        // REQUIRED FIELD VALIDATIONS
+        validateRequiredFields(dto);
+
+        // ✅ STRICT QUARTER AND DEADLINE VALIDATION
+        validateStrictQuarterAndDeadline(currentDate, dto);
+
         Task task = new Task();
 
-        // Map DTO → Entity
+        // Map DTO → Entity (only after validation passes)
         mapDtoToEntity(dto, task);
 
-        // Set Year & Task Code
-        int year = LocalDateTime.now().getYear();
-        task.setYear(year);
+        // Set Task Code using the year from DTO
+        int year = dto.getYear();
         long count = taskRepository.countByYear(year) + 1;
         task.setTaskCode(String.format("TSK/%02d/%03d", year % 100, count));
 
@@ -86,29 +202,119 @@ public class TaskService {
             task.setTaskStatus(TaskStatus.ASSIGNED);
         }
 
-        return convertToResponse(taskRepository.save(task));
+        Task savedTask = taskRepository.save(task);
+        return convertToResponse(savedTask);
     }
 
     // ===============================
-    // UPDATE TASK
+    // VALIDATE REQUIRED FIELDS
+    // ===============================
+    private void validateRequiredFields(TaskDTO dto) {
+        List<String> errors = new java.util.ArrayList<>();
+
+        if (dto == null) {
+            throw new IllegalArgumentException("Task data cannot be null");
+        }
+
+        // Validate Description (required)
+        if (dto.getDescription() == null || dto.getDescription().trim().isEmpty()) {
+            errors.add("Task description is required and cannot be empty");
+        }
+
+        // Validate Deadline (required) - basic check, strict check in validateStrictQuarterAndDeadline
+        if (dto.getDeadline() == null) {
+            errors.add("Task deadline is required");
+        }
+
+        // Validate Quarter (required)
+        if (dto.getQuarter() == null) {
+            errors.add("Task quarter is required");
+        }
+
+        // Validate Supervisor (required)
+        if (dto.getSupervisorId() == null) {
+            errors.add("Supervisor ID is required");
+        }
+
+        // Validate Created By (required)
+        if (dto.getCreatedByCode() == null) {
+            errors.add("Created by staff code is required");
+        }
+
+        // Validate Year (required)
+        if (dto.getYear() == null) {
+            errors.add("Year is required");
+        }
+
+        if (!errors.isEmpty()) {
+            String errorMessage = String.join("; ", errors);
+            throw new IllegalArgumentException("Validation failed: " + errorMessage);
+        }
+    }
+
+    // ===============================
+    // UPDATE TASK WITH VALIDATION
     // ===============================
     @Transactional
     public Optional<TaskDTOResponse> updateTask(Long taskId, TaskDTO dto) {
         return taskRepository.findById(taskId)
                 .map(task -> {
                     TaskStatus oldStatus = task.getTaskStatus();
+                    LocalDateTime currentDate = LocalDateTime.now();
 
-                    if (dto.getDescription() != null) task.setDescription(dto.getDescription());
+                    // Validate update-specific fields
+                    if (dto.getDescription() != null && dto.getDescription().trim().isEmpty()) {
+                        throw new IllegalArgumentException("Description cannot be empty");
+                    }
+
+                    // For updates, validate deadline is within current quarter if being updated
+                    if (dto.getDeadline() != null) {
+                        Quarter currentQuarter = getCurrentQuarter(currentDate);
+                        int currentYear = currentDate.getYear();
+                        LocalDateTime quarterStart = getQuarterStartDate(currentQuarter, currentYear);
+                        LocalDateTime quarterEnd = getQuarterEndDate(currentQuarter, currentYear);
+
+                        if (dto.getDeadline().isBefore(quarterStart) || dto.getDeadline().isAfter(quarterEnd)) {
+                            throw new IllegalArgumentException(
+                                    String.format("Deadline must be within the current quarter (%s): %s to %s",
+                                            currentQuarter, quarterStart.toLocalDate(), quarterEnd.toLocalDate())
+                            );
+                        }
+
+                        if (dto.getDeadline().isBefore(currentDate)) {
+                            throw new IllegalArgumentException("Deadline cannot be in the past");
+                        }
+                    }
+
+                    // Update only non-null fields
+                    if (dto.getDescription() != null) task.setDescription(dto.getDescription().trim());
                     if (dto.getDeadline() != null) task.setDeadline(dto.getDeadline());
-                    if (dto.getQuarter() != null) task.setQuarter(dto.getQuarter());
-                    if (dto.getYear() != null) task.setYear(dto.getYear());
                     if (dto.getTaskStatus() != null) task.setTaskStatus(dto.getTaskStatus());
 
-                    handleRelations(dto, task);
+                    // Handle relations
+                    if (dto.getSupervisorId() != null) {
+                        supervisorRepository.findById(dto.getSupervisorId())
+                                .ifPresentOrElse(
+                                        task::setSupervisor,
+                                        () -> {
+                                            throw new RuntimeException("Supervisor not found with id: " + dto.getSupervisorId());
+                                        }
+                                );
+                    }
+
+                    if (dto.getCreatedByCode() != null) {
+                        userRepository.findByStaffCode(dto.getCreatedByCode())
+                                .ifPresentOrElse(
+                                        task::setCreatedBy,
+                                        () -> {
+                                            throw new RuntimeException("User not found with staff code: " + dto.getCreatedByCode());
+                                        }
+                                );
+                    }
 
                     Task savedTask = taskRepository.save(task);
 
-                    // ✅ SYNC: If status changed, update all assignments
+                    // SYNC: If status changed, update all assignments
                     if (dto.getTaskStatus() != null && !dto.getTaskStatus().equals(oldStatus)) {
                         syncAssignmentsWithTaskStatus(taskId, dto.getTaskStatus());
                     }
@@ -124,6 +330,7 @@ public class TaskService {
     public boolean deleteTask(Long taskId) {
         return taskRepository.findById(taskId)
                 .map(task -> {
+                    assignmentRepository.deleteByTask_TaskId(taskId);
                     taskRepository.delete(task);
                     return true;
                 })
@@ -134,6 +341,9 @@ public class TaskService {
     // SEARCH TASKS
     // ===============================
     public List<TaskDTOResponse> searchTasksByCodeOrDescription(String query) {
+        if (query == null || query.trim().isEmpty()) {
+            return getAllTasks();
+        }
         return taskRepository
                 .findByTaskCodeContainingIgnoreCaseOrDescriptionContainingIgnoreCase(query, query)
                 .stream()
@@ -142,16 +352,19 @@ public class TaskService {
     }
 
     // ===============================
-    // WORKFLOW METHODS - FIXED WITH SYNC
+    // WORKFLOW METHODS
     // ===============================
     @Transactional
     public boolean staffAcceptTask(Long taskId, Long staffCode) {
         Task task = getTaskOrThrow(taskId);
-        if (task.getTaskStatus() != TaskStatus.ASSIGNED) return false;
+        validateStaffAssignment(task, staffCode);
+
+        if (task.getTaskStatus() != TaskStatus.ASSIGNED) {
+            throw new IllegalStateException("Task cannot be accepted. Current status: " + task.getTaskStatus());
+        }
+
         task.setTaskStatus(TaskStatus.INITIATED);
         taskRepository.save(task);
-
-        // ✅ SYNC: Update all assignments for this task
         syncAssignmentsWithTaskStatus(taskId, TaskStatus.INITIATED);
 
         return true;
@@ -160,11 +373,14 @@ public class TaskService {
     @Transactional
     public boolean staffStartProgress(Long taskId, Long staffCode) {
         Task task = getTaskOrThrow(taskId);
-        if (task.getTaskStatus() != TaskStatus.INITIATED) return false;
+        validateStaffAssignment(task, staffCode);
+
+        if (task.getTaskStatus() != TaskStatus.INITIATED) {
+            throw new IllegalStateException("Task cannot be started. Current status: " + task.getTaskStatus());
+        }
+
         task.setTaskStatus(TaskStatus.IN_PROGRESS);
         taskRepository.save(task);
-
-        // ✅ SYNC: Update all assignments for this task
         syncAssignmentsWithTaskStatus(taskId, TaskStatus.IN_PROGRESS);
 
         return true;
@@ -173,11 +389,14 @@ public class TaskService {
     @Transactional
     public boolean staffMarkComplete(Long taskId, Long staffCode) {
         Task task = getTaskOrThrow(taskId);
-        if (task.getTaskStatus() != TaskStatus.IN_PROGRESS) return false;
+        validateStaffAssignment(task, staffCode);
+
+        if (task.getTaskStatus() != TaskStatus.IN_PROGRESS) {
+            throw new IllegalStateException("Task cannot be completed. Current status: " + task.getTaskStatus());
+        }
+
         task.setTaskStatus(TaskStatus.COMPLETED);
         taskRepository.save(task);
-
-        // ✅ SYNC: Update all assignments for this task
         syncAssignmentsWithTaskStatus(taskId, TaskStatus.COMPLETED);
 
         return true;
@@ -186,11 +405,14 @@ public class TaskService {
     @Transactional
     public boolean staffSubmitForReview(Long taskId, Long staffCode) {
         Task task = getTaskOrThrow(taskId);
-        if (task.getTaskStatus() != TaskStatus.COMPLETED) return false;
+        validateStaffAssignment(task, staffCode);
+
+        if (task.getTaskStatus() != TaskStatus.COMPLETED) {
+            throw new IllegalStateException("Task cannot be submitted for review. Current status: " + task.getTaskStatus());
+        }
+
         task.setTaskStatus(TaskStatus.PENDING_REVIEW);
         taskRepository.save(task);
-
-        // ✅ SYNC: Update all assignments for this task
         syncAssignmentsWithTaskStatus(taskId, TaskStatus.PENDING_REVIEW);
 
         return true;
@@ -199,19 +421,18 @@ public class TaskService {
     @Transactional
     public boolean supervisorApprove(Long taskId, String supervisorCode) {
         Task task = getTaskOrThrow(taskId);
+
         if (task.getTaskStatus() != TaskStatus.COMPLETED && task.getTaskStatus() != TaskStatus.PENDING_REVIEW) {
-            return false;
+            throw new IllegalStateException("Task cannot be approved. Current status: " + task.getTaskStatus());
         }
 
         if (task.getSupervisor() == null ||
                 !task.getSupervisor().getSupervisorCode().equals(supervisorCode)) {
-            throw new RuntimeException("Supervisor mismatch");
+            throw new RuntimeException("Supervisor mismatch or not authorized to approve this task");
         }
 
         task.setTaskStatus(TaskStatus.APPROVED);
         taskRepository.save(task);
-
-        // ✅ SYNC: Update all assignments for this task
         syncAssignmentsWithTaskStatus(taskId, TaskStatus.APPROVED);
 
         return true;
@@ -220,24 +441,42 @@ public class TaskService {
     @Transactional
     public boolean supervisorReject(Long taskId, String supervisorCode, String reason) {
         Task task = getTaskOrThrow(taskId);
-        if (task.getTaskStatus() != TaskStatus.PENDING_REVIEW) return false;
+
+        if (task.getTaskStatus() != TaskStatus.PENDING_REVIEW) {
+            throw new IllegalStateException("Task cannot be rejected. Current status: " + task.getTaskStatus());
+        }
 
         if (task.getSupervisor() == null ||
                 !task.getSupervisor().getSupervisorCode().equals(supervisorCode)) {
-            throw new RuntimeException("Supervisor mismatch");
+            throw new RuntimeException("Supervisor mismatch or not authorized to reject this task");
+        }
+
+        if (reason == null || reason.trim().isEmpty()) {
+            throw new IllegalArgumentException("Rejection reason is required");
         }
 
         task.setTaskStatus(TaskStatus.REJECTED);
         taskRepository.save(task);
-
-        // ✅ SYNC: Update all assignments for this task
         syncAssignmentsWithTaskStatus(taskId, TaskStatus.REJECTED);
 
         return true;
     }
 
     // ===============================
-    // ✅ NEW: SYNC ASSIGNMENTS WITH TASK STATUS
+    // VALIDATE STAFF ASSIGNMENT
+    // ===============================
+    private void validateStaffAssignment(Task task, Long staffCode) {
+        boolean isAssigned = assignmentRepository.existsByTask_TaskIdAndAssignUser_StaffCode(
+                task.getTaskId(), staffCode);
+
+        if (!isAssigned) {
+            throw new RuntimeException("Staff with code " + staffCode +
+                    " is not assigned to task " + task.getTaskId());
+        }
+    }
+
+    // ===============================
+    // SYNC ASSIGNMENTS WITH TASK STATUS
     // ===============================
     private void syncAssignmentsWithTaskStatus(Long taskId, TaskStatus newStatus) {
         List<TaskAssignment> assignments = assignmentRepository.findByTask_TaskId(taskId);
@@ -252,45 +491,42 @@ public class TaskService {
     // ===============================
     private Task getTaskOrThrow(Long taskId) {
         return taskRepository.findById(taskId)
-                .orElseThrow(() -> new RuntimeException("Task not found"));
+                .orElseThrow(() -> new RuntimeException("Task not found with id: " + taskId));
     }
 
     private void mapDtoToEntity(TaskDTO dto, Task task) {
-        if (dto.getDescription() != null) task.setDescription(dto.getDescription());
-        if (dto.getDeadline() != null) task.setDeadline(dto.getDeadline());
-        if (dto.getQuarter() != null) task.setQuarter(dto.getQuarter());
-        if (dto.getTaskStatus() != null) task.setTaskStatus(dto.getTaskStatus());
-        if (dto.getYear() != null) task.setYear(dto.getYear());
-
+        task.setDescription(dto.getDescription().trim());
+        task.setDeadline(dto.getDeadline());
+        task.setQuarter(dto.getQuarter());
+        task.setTaskStatus(dto.getTaskStatus() != null ? dto.getTaskStatus() : TaskStatus.ASSIGNED);
+        task.setYear(dto.getYear());
         handleRelations(dto, task);
     }
 
     private void handleRelations(TaskDTO dto, Task task) {
-        // Supervisor
-        if (dto.getSupervisorId() != null) {
-            supervisorRepository.findById(dto.getSupervisorId())
-                    .ifPresentOrElse(
-                            task::setSupervisor,
-                            () -> {
-                                throw new RuntimeException("Supervisor not found with id: " + dto.getSupervisorId());
-                            }
-                    );
-        } else {
-            task.setSupervisor(null);
+        if (dto.getSupervisorId() == null) {
+            throw new IllegalArgumentException("Supervisor ID is required");
         }
 
-        // Created By
-        if (dto.getCreatedByCode() != null) {
-            userRepository.findByStaffCode(dto.getCreatedByCode())
-                    .ifPresentOrElse(
-                            task::setCreatedBy,
-                            () -> {
-                                throw new RuntimeException("User not found with staff code: " + dto.getCreatedByCode());
-                            }
-                    );
-        } else {
-            task.setCreatedBy(null);
+        supervisorRepository.findById(dto.getSupervisorId())
+                .ifPresentOrElse(
+                        task::setSupervisor,
+                        () -> {
+                            throw new RuntimeException("Supervisor not found with id: " + dto.getSupervisorId());
+                        }
+                );
+
+        if (dto.getCreatedByCode() == null) {
+            throw new IllegalArgumentException("Created by staff code is required");
         }
+
+        userRepository.findByStaffCode(dto.getCreatedByCode())
+                .ifPresentOrElse(
+                        task::setCreatedBy,
+                        () -> {
+                            throw new RuntimeException("User not found with staff code: " + dto.getCreatedByCode());
+                        }
+                );
     }
 
     // ===============================
@@ -309,7 +545,6 @@ public class TaskService {
         resp.setCreatedAt(task.getCreatedAt());
         resp.setUpdatedAt(task.getUpdatedAt());
 
-        // Supervisor
         if (task.getSupervisor() != null) {
             resp.setSupervisorCode(String.valueOf(task.getSupervisor().getSupervisorId()));
             String fullName = getFullName(task.getSupervisor().getUser());
@@ -319,7 +554,6 @@ public class TaskService {
             resp.setSupervisorName("N/A");
         }
 
-        // Created By
         if (task.getCreatedBy() != null) {
             resp.setCreatedByStaffCode(task.getCreatedBy().getStaffCode());
             String fullName = getFullName(task.getCreatedBy());

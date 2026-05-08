@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 import static jakarta.persistence.GenerationType.SEQUENCE;
 
 @Entity
+@Table(name = "evaluation")
 public class Evaluation {
 
     @Id
@@ -37,6 +38,10 @@ public class Evaluation {
     )
     private Supervisor supervisor;
 
+    // ✅ NEW: Staff ID for evaluation isolation
+    @Column(name = "staff_id", nullable = false)
+    private Long staffId;
+
     private Double score;
     private String remarks;
     private LocalDateTime evaluationDate;
@@ -47,11 +52,14 @@ public class Evaluation {
 
     public Evaluation() {}
 
-    public Evaluation(Long evaluationId, String evaluationCode, Task task, Supervisor supervisor, Double score, String remarks, LocalDateTime evaluationDate, Integer year, Integer quarter, LocalDateTime createdAt, LocalDateTime updatedAt) {
+    public Evaluation(Long evaluationId, String evaluationCode, Task task, Supervisor supervisor,
+                      Long staffId, Double score, String remarks, LocalDateTime evaluationDate,
+                      Integer year, Integer quarter, LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.evaluationId = evaluationId;
         this.evaluationCode = evaluationCode;
         this.task = task;
         this.supervisor = supervisor;
+        this.staffId = staffId;
         this.score = score;
         this.remarks = remarks;
         this.evaluationDate = evaluationDate;
@@ -61,6 +69,7 @@ public class Evaluation {
         this.updatedAt = updatedAt;
     }
 
+    // Getters and Setters
     public Long getEvaluationId() {
         return evaluationId;
     }
@@ -91,6 +100,14 @@ public class Evaluation {
 
     public void setSupervisor(Supervisor supervisor) {
         this.supervisor = supervisor;
+    }
+
+    public Long getStaffId() {
+        return staffId;
+    }
+
+    public void setStaffId(Long staffId) {
+        this.staffId = staffId;
     }
 
     public Double getScore() {
@@ -149,6 +166,17 @@ public class Evaluation {
         this.updatedAt = updatedAt;
     }
 
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
+
     @Override
     public String toString() {
         return "Evaluation{" +
@@ -156,6 +184,7 @@ public class Evaluation {
                 ", evaluationCode='" + evaluationCode + '\'' +
                 ", task=" + task +
                 ", supervisor=" + supervisor +
+                ", staffId=" + staffId +
                 ", score=" + score +
                 ", remarks='" + remarks + '\'' +
                 ", evaluationDate=" + evaluationDate +

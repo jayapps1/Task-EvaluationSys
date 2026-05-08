@@ -1,6 +1,7 @@
 package com.evaluationsys.taskevaluationsys.service.admin;
 
 import com.evaluationsys.taskevaluationsys.dtoresponse.TaskAssignmentDTOResponse;
+import com.evaluationsys.taskevaluationsys.dtoresponse.UserDTOResponse;
 import com.evaluationsys.taskevaluationsys.entity.*;
 import com.evaluationsys.taskevaluationsys.entity.enums.Role;
 import com.evaluationsys.taskevaluationsys.entity.enums.TaskStatus;
@@ -33,6 +34,97 @@ public class AdminDashboardService {
     private TaskAssignmentRepository assignmentRepository;
 
     // =========================
+    // ✅ CONVERT USER TO DTO (ADD THIS METHOD)
+    // =========================
+    private UserDTOResponse convertToUserDTO(User user) {
+        if (user == null) return null;
+
+        UserDTOResponse dto = new UserDTOResponse();
+        dto.setStaffId(user.getStaffId());
+        dto.setStaffCode(user.getStaffCode());
+        dto.setFirstName(user.getFirstName());
+        dto.setOtherName(user.getOtherName());
+        dto.setEmail(user.getEmail());
+        dto.setPhoneNumber(user.getPhoneNumber());
+        dto.setRole(user.getRole() != null ? user.getRole().name() : null);
+        dto.setRank(user.getRank());
+        dto.setActive(user.getActive());
+
+        // ✅ CRITICAL: Set branch ID and name
+        if (user.getBranch() != null) {
+            dto.setBranchId(user.getBranch().getBranchId());
+            dto.setBranchName(user.getBranch().getBranchName());
+        }
+
+        // ✅ CRITICAL: Set department ID and name
+        if (user.getDepartment() != null) {
+            dto.setDepartmentId(user.getDepartment().getDepartmentId());
+            dto.setDepartmentName(user.getDepartment().getDepartmentName());
+        }
+
+        return dto;
+    }
+
+    // =========================
+    // ✅ GET ALL STAFF AS DTO (ADD THIS METHOD - FRONTEND USES THIS)
+    // =========================
+    public List<UserDTOResponse> getAllStaffDTO() {
+        return userRepository.findByRole(Role.STAFF).stream()
+                .map(this::convertToUserDTO)
+                .collect(Collectors.toList());
+    }
+
+    // =========================
+    // ✅ GET ALL USERS (STAFF + SUPERVISORS) AS DTO (ADD THIS METHOD)
+    // =========================
+    public List<UserDTOResponse> getAllNonAdminUsersDTO() {
+        return userRepository.findAll().stream()
+                .filter(user -> user.getRole() != Role.ADMIN)
+                .map(this::convertToUserDTO)
+                .collect(Collectors.toList());
+    }
+
+    // =========================
+    // ✅ GET FILTERED STAFF AS DTO
+    // =========================
+    public List<UserDTOResponse> getFilteredStaffDTO(Long branchId, Long deptId) {
+        return userRepository.findByRole(Role.STAFF).stream()
+                .filter(u -> {
+                    if (branchId != null && (u.getBranch() == null ||
+                            !u.getBranch().getBranchId().equals(branchId))) {
+                        return false;
+                    }
+                    if (deptId != null && (u.getDepartment() == null ||
+                            !u.getDepartment().getDepartmentId().equals(deptId))) {
+                        return false;
+                    }
+                    return true;
+                })
+                .map(this::convertToUserDTO)
+                .collect(Collectors.toList());
+    }
+
+    // =========================
+    // ✅ GET STAFF BY BRANCH AS DTO
+    // =========================
+    public List<UserDTOResponse> getStaffByBranchDTO(Long branchId) {
+        return userRepository.findByRole(Role.STAFF).stream()
+                .filter(u -> u.getBranch() != null && u.getBranch().getBranchId().equals(branchId))
+                .map(this::convertToUserDTO)
+                .collect(Collectors.toList());
+    }
+
+    // =========================
+    // ✅ GET STAFF BY DEPARTMENT AS DTO
+    // =========================
+    public List<UserDTOResponse> getStaffByDepartmentDTO(Long deptId) {
+        return userRepository.findByRole(Role.STAFF).stream()
+                .filter(u -> u.getDepartment() != null && u.getDepartment().getDepartmentId().equals(deptId))
+                .map(this::convertToUserDTO)
+                .collect(Collectors.toList());
+    }
+
+    // =========================
     // DASHBOARD STATISTICS - FIXED
     // =========================
     public AdminStatistics getDashboardStatistics() {
@@ -50,9 +142,15 @@ public class AdminDashboardService {
         stats.setTotalSupervisors(uniqueSupervisors);
 
         stats.setTotalBranches(branchRepository.count());
-        stats.setTotalDepartments(departmentRepository.count());
 
-        // Task counts from TaskAssignment (each assignment = one task for a staff)
+        // FIX 1: Count unique department names, not physical department records
+        long uniqueDepartmentNames = departmentRepository.findAll().stream()
+                .map(Department::getDepartmentName)
+                .distinct()
+                .count();
+        stats.setTotalDepartments(uniqueDepartmentNames);
+
+        // Task counts from TaskAssignment
         List<TaskAssignment> allAssignments = assignmentRepository.findAll();
         stats.setTotalTasks(allAssignments.size());
 
@@ -69,14 +167,16 @@ public class AdminDashboardService {
         stats.setPendingApprovalTasks((int) allAssignments.stream()
                 .filter(a -> a.getStatus() == TaskStatus.PENDING_APPROVAL).count());
 
-        stats.setApprovedTasks((int) allAssignments.stream()
-                .filter(a -> a.getStatus() == TaskStatus.APPROVED).count());
+        // FIX 2: Count APPROVED tasks correctly
+        int approvedCount = (int) allAssignments.stream()
+                .filter(a -> a.getStatus() == TaskStatus.APPROVED).count();
+        stats.setApprovedTasks(approvedCount);
 
         stats.setRejectedTasks((int) allAssignments.stream()
                 .filter(a -> a.getStatus() == TaskStatus.REJECTED).count());
 
-        stats.setCompletedTasks((int) allAssignments.stream()
-                .filter(a -> a.getStatus() == TaskStatus.COMPLETED).count());
+        // FIX 3: Completed = Approved (same count)
+        stats.setCompletedTasks(approvedCount);
 
         return stats;
     }
@@ -98,7 +198,13 @@ public class AdminDashboardService {
         stats.setTotalSupervisors(uniqueSupervisors);
 
         stats.setTotalBranches(branchRepository.count());
-        stats.setTotalDepartments(departmentRepository.count());
+
+        // Count unique department names
+        long uniqueDepartmentNames = departmentRepository.findAll().stream()
+                .map(Department::getDepartmentName)
+                .distinct()
+                .count();
+        stats.setTotalDepartments(uniqueDepartmentNames);
 
         // Get filtered assignments
         List<TaskAssignment> filteredAssignments = getFilteredAssignments(branchId, deptId, quarter);
@@ -113,12 +219,14 @@ public class AdminDashboardService {
                 .filter(a -> a.getStatus() == TaskStatus.PENDING_REVIEW).count());
         stats.setPendingApprovalTasks((int) filteredAssignments.stream()
                 .filter(a -> a.getStatus() == TaskStatus.PENDING_APPROVAL).count());
-        stats.setApprovedTasks((int) filteredAssignments.stream()
-                .filter(a -> a.getStatus() == TaskStatus.APPROVED).count());
+
+        int approvedCount = (int) filteredAssignments.stream()
+                .filter(a -> a.getStatus() == TaskStatus.APPROVED).count();
+        stats.setApprovedTasks(approvedCount);
+        stats.setCompletedTasks(approvedCount);
+
         stats.setRejectedTasks((int) filteredAssignments.stream()
                 .filter(a -> a.getStatus() == TaskStatus.REJECTED).count());
-        stats.setCompletedTasks((int) filteredAssignments.stream()
-                .filter(a -> a.getStatus() == TaskStatus.COMPLETED).count());
 
         return stats;
     }
@@ -170,7 +278,112 @@ public class AdminDashboardService {
     }
 
     // =========================
-    // ✅ DEPARTMENT PERFORMANCE - WITH BRANCH NAME & IN PROGRESS
+    // ✅ DEPARTMENT PERFORMANCE BY BRANCH
+    // =========================
+    public Map<String, List<Map<String, Object>>> getDepartmentPerformanceByBranch() {
+        List<Department> departments = departmentRepository.findAll();
+        Map<String, List<Map<String, Object>>> performanceByBranch = new LinkedHashMap<>();
+
+        for (Department dept : departments) {
+            // Get branch name from staff in this department
+            String branchName = "Unassigned";
+            Optional<User> staffInDept = userRepository.findByRole(Role.STAFF).stream()
+                    .filter(u -> u.getDepartment() != null &&
+                            u.getDepartment().getDepartmentId().equals(dept.getDepartmentId()) &&
+                            u.getBranch() != null)
+                    .findFirst();
+            if (staffInDept.isPresent()) {
+                branchName = staffInDept.get().getBranch().getBranchName();
+            }
+
+            List<TaskAssignment> assignments = assignmentRepository.findAll().stream()
+                    .filter(a -> a.getAssignUser() != null &&
+                            a.getAssignUser().getDepartment() != null &&
+                            a.getAssignUser().getDepartment().getDepartmentId().equals(dept.getDepartmentId()))
+                    .collect(Collectors.toList());
+
+            long total = assignments.size();
+            // Completed = APPROVED tasks
+            long completed = assignments.stream()
+                    .filter(a -> a.getStatus() == TaskStatus.APPROVED)
+                    .count();
+
+            Map<String, Object> stats = new HashMap<>();
+            stats.put("departmentId", dept.getDepartmentId());
+            stats.put("departmentName", dept.getDepartmentName());
+            stats.put("branchName", branchName);
+            stats.put("totalTasks", total);
+            stats.put("completedTasks", completed);
+            stats.put("completionRate", total > 0 ? (completed * 100.0 / total) : 0);
+
+            performanceByBranch.computeIfAbsent(branchName, k -> new ArrayList<>()).add(stats);
+        }
+
+        // Sort departments within each branch by completion rate
+        for (Map.Entry<String, List<Map<String, Object>>> entry : performanceByBranch.entrySet()) {
+            entry.getValue().sort((a, b) -> Double.compare(
+                    (Double) b.get("completionRate"),
+                    (Double) a.get("completionRate")
+            ));
+        }
+
+        return performanceByBranch;
+    }
+
+    // =========================
+    // ✅ FILTERED DEPARTMENT PERFORMANCE BY BRANCH
+    // =========================
+    public Map<String, List<Map<String, Object>>> getDepartmentPerformanceByBranchFiltered(Long branchId, Long deptId, String quarter) {
+        List<Department> departments = departmentRepository.findAll();
+        Map<String, List<Map<String, Object>>> performanceByBranch = new LinkedHashMap<>();
+
+        for (Department dept : departments) {
+            // Get branch name from staff in this department
+            String branchName = "Unassigned";
+            Optional<User> staffInDept = userRepository.findByRole(Role.STAFF).stream()
+                    .filter(u -> u.getDepartment() != null &&
+                            u.getDepartment().getDepartmentId().equals(dept.getDepartmentId()) &&
+                            u.getBranch() != null)
+                    .findFirst();
+            if (staffInDept.isPresent()) {
+                branchName = staffInDept.get().getBranch().getBranchName();
+            }
+
+            List<TaskAssignment> assignments = getFilteredAssignments(branchId, deptId, quarter).stream()
+                    .filter(a -> a.getAssignUser() != null &&
+                            a.getAssignUser().getDepartment() != null &&
+                            a.getAssignUser().getDepartment().getDepartmentId().equals(dept.getDepartmentId()))
+                    .collect(Collectors.toList());
+
+            long total = assignments.size();
+            long completed = assignments.stream()
+                    .filter(a -> a.getStatus() == TaskStatus.APPROVED)
+                    .count();
+
+            Map<String, Object> stats = new HashMap<>();
+            stats.put("departmentId", dept.getDepartmentId());
+            stats.put("departmentName", dept.getDepartmentName());
+            stats.put("branchName", branchName);
+            stats.put("totalTasks", total);
+            stats.put("completedTasks", completed);
+            stats.put("completionRate", total > 0 ? (completed * 100.0 / total) : 0);
+
+            performanceByBranch.computeIfAbsent(branchName, k -> new ArrayList<>()).add(stats);
+        }
+
+        // Sort departments within each branch by completion rate
+        for (Map.Entry<String, List<Map<String, Object>>> entry : performanceByBranch.entrySet()) {
+            entry.getValue().sort((a, b) -> Double.compare(
+                    (Double) b.get("completionRate"),
+                    (Double) a.get("completionRate")
+            ));
+        }
+
+        return performanceByBranch;
+    }
+
+    // =========================
+    // ✅ DEPARTMENT PERFORMANCE
     // =========================
     public List<Map<String, Object>> getDepartmentPerformance() {
         List<Department> departments = departmentRepository.findAll();
@@ -198,10 +411,6 @@ public class AdminDashboardService {
             long completed = assignments.stream()
                     .filter(a -> a.getStatus() == TaskStatus.APPROVED)
                     .count();
-            long inProgress = assignments.stream()
-                    .filter(a -> a.getStatus() == TaskStatus.INITIATED ||
-                            a.getStatus() == TaskStatus.IN_PROGRESS)
-                    .count();
 
             Map<String, Object> stats = new HashMap<>();
             stats.put("departmentId", dept.getDepartmentId());
@@ -209,7 +418,6 @@ public class AdminDashboardService {
             stats.put("branchName", branchName);
             stats.put("totalTasks", total);
             stats.put("completedTasks", completed);
-            stats.put("inProgressTasks", inProgress);
             stats.put("completionRate", total > 0 ? (completed * 100.0 / total) : 0);
 
             performance.add(stats);
@@ -221,7 +429,7 @@ public class AdminDashboardService {
     }
 
     // =========================
-    // ✅ FILTERED DEPARTMENT PERFORMANCE - WITH IN PROGRESS
+    // ✅ FILTERED DEPARTMENT PERFORMANCE
     // =========================
     public List<Map<String, Object>> getDepartmentPerformanceFiltered(Long branchId, Long deptId, String quarter) {
         List<Department> departments = departmentRepository.findAll();
@@ -249,10 +457,6 @@ public class AdminDashboardService {
             long completed = assignments.stream()
                     .filter(a -> a.getStatus() == TaskStatus.APPROVED)
                     .count();
-            long inProgress = assignments.stream()
-                    .filter(a -> a.getStatus() == TaskStatus.INITIATED ||
-                            a.getStatus() == TaskStatus.IN_PROGRESS)
-                    .count();
 
             Map<String, Object> stats = new HashMap<>();
             stats.put("departmentId", dept.getDepartmentId());
@@ -260,7 +464,6 @@ public class AdminDashboardService {
             stats.put("branchName", branchName);
             stats.put("totalTasks", total);
             stats.put("completedTasks", completed);
-            stats.put("inProgressTasks", inProgress);
             stats.put("completionRate", total > 0 ? (completed * 100.0 / total) : 0);
 
             performance.add(stats);
@@ -272,7 +475,7 @@ public class AdminDashboardService {
     }
 
     // =========================
-    // ✅ BRANCH PERFORMANCE - WITH IN PROGRESS & PENDING
+    // ✅ BRANCH PERFORMANCE
     // =========================
     public List<Map<String, Object>> getBranchPerformance() {
         List<Branch> branches = branchRepository.findAll();
@@ -289,21 +492,12 @@ public class AdminDashboardService {
             long completed = assignments.stream()
                     .filter(a -> a.getStatus() == TaskStatus.APPROVED)
                     .count();
-            long inProgress = assignments.stream()
-                    .filter(a -> a.getStatus() == TaskStatus.INITIATED ||
-                            a.getStatus() == TaskStatus.IN_PROGRESS)
-                    .count();
-            long pending = assignments.stream()
-                    .filter(a -> a.getStatus() == TaskStatus.ASSIGNED)
-                    .count();
 
             Map<String, Object> stats = new HashMap<>();
             stats.put("branchId", branch.getBranchId());
             stats.put("branchName", branch.getBranchName());
             stats.put("totalTasks", total);
             stats.put("completedTasks", completed);
-            stats.put("inProgressTasks", inProgress);
-            stats.put("pendingTasks", pending);
             stats.put("completionRate", total > 0 ? (completed * 100.0 / total) : 0);
 
             performance.add(stats);
@@ -315,7 +509,7 @@ public class AdminDashboardService {
     }
 
     // =========================
-    // ✅ FILTERED BRANCH PERFORMANCE - WITH IN PROGRESS & PENDING
+    // ✅ FILTERED BRANCH PERFORMANCE
     // =========================
     public List<Map<String, Object>> getBranchPerformanceFiltered(Long branchId, Long deptId, String quarter) {
         List<Branch> branches = branchRepository.findAll();
@@ -332,21 +526,12 @@ public class AdminDashboardService {
             long completed = assignments.stream()
                     .filter(a -> a.getStatus() == TaskStatus.APPROVED)
                     .count();
-            long inProgress = assignments.stream()
-                    .filter(a -> a.getStatus() == TaskStatus.INITIATED ||
-                            a.getStatus() == TaskStatus.IN_PROGRESS)
-                    .count();
-            long pending = assignments.stream()
-                    .filter(a -> a.getStatus() == TaskStatus.ASSIGNED)
-                    .count();
 
             Map<String, Object> stats = new HashMap<>();
             stats.put("branchId", branch.getBranchId());
             stats.put("branchName", branch.getBranchName());
             stats.put("totalTasks", total);
             stats.put("completedTasks", completed);
-            stats.put("inProgressTasks", inProgress);
-            stats.put("pendingTasks", pending);
             stats.put("completionRate", total > 0 ? (completed * 100.0 / total) : 0);
 
             performance.add(stats);
@@ -436,7 +621,7 @@ public class AdminDashboardService {
     }
 
     // =========================
-    // SUPERVISOR COUNTS BY DEPARTMENT (Unique supervisors)
+    // SUPERVISOR COUNTS BY DEPARTMENT
     // =========================
     public Map<String, Long> getSupervisorCountByDepartment() {
         List<Supervisor> supervisors = supervisorRepository.findAll();
@@ -478,14 +663,14 @@ public class AdminDashboardService {
     }
 
     // =========================
-    // GET ALL STAFF
+    // GET ALL STAFF (RAW - keep for backward compatibility)
     // =========================
     public List<User> getAllStaff() {
         return userRepository.findByRole(Role.STAFF);
     }
 
     // =========================
-    // GET FILTERED STAFF
+    // GET FILTERED STAFF (RAW)
     // =========================
     public List<User> getFilteredStaff(Long branchId, Long deptId) {
         return userRepository.findByRole(Role.STAFF).stream()
@@ -504,7 +689,7 @@ public class AdminDashboardService {
     }
 
     // =========================
-    // GET STAFF BY BRANCH
+    // GET STAFF BY BRANCH (RAW)
     // =========================
     public List<User> getStaffByBranch(Long branchId) {
         return userRepository.findByRole(Role.STAFF).stream()
@@ -513,7 +698,7 @@ public class AdminDashboardService {
     }
 
     // =========================
-    // GET STAFF BY DEPARTMENT
+    // GET STAFF BY DEPARTMENT (RAW)
     // =========================
     public List<User> getStaffByDepartment(Long deptId) {
         return userRepository.findByRole(Role.STAFF).stream()
@@ -618,14 +803,14 @@ public class AdminDashboardService {
     }
 
     // =========================
-    // ✅ GET ALL ASSIGNMENTS (for export)
+    // GET ALL ASSIGNMENTS
     // =========================
     public List<TaskAssignment> getAllAssignments() {
         return assignmentRepository.findAll();
     }
 
     // =========================
-    // ✅ GET ALL SUPERVISORS (for export)
+    // GET ALL SUPERVISORS
     // =========================
     public List<Supervisor> getAllSupervisors() {
         return supervisorRepository.findAll();
@@ -645,7 +830,7 @@ public class AdminDashboardService {
     }
 
     // =========================
-    // ✅ STAFF PERFORMANCE STATS - WITH IN PROGRESS
+    // STAFF PERFORMANCE STATS
     // =========================
     public List<Map<String, Object>> getStaffPerformanceStats() {
         List<User> staff = userRepository.findByRole(Role.STAFF);
@@ -655,20 +840,16 @@ public class AdminDashboardService {
             List<TaskAssignment> assignments = assignmentRepository.findByAssignUser_StaffId(s.getStaffId());
             long completed = assignments.stream()
                     .filter(a -> a.getStatus() == TaskStatus.APPROVED).count();
-            long inProgress = assignments.stream()
-                    .filter(a -> a.getStatus() == TaskStatus.INITIATED ||
-                            a.getStatus() == TaskStatus.IN_PROGRESS).count();
             long total = assignments.size();
 
             Map<String, Object> stats = new HashMap<>();
             stats.put("staffId", s.getStaffId());
-            stats.put("staffName", s.getFirstName() + " " + s.getOtherName());
+            stats.put("staffName", s.getFirstName() + " " + (s.getOtherName() != null ? s.getOtherName() : ""));
             stats.put("staffCode", s.getStaffCode());
             stats.put("branch", s.getBranch() != null ? s.getBranch().getBranchName() : "N/A");
             stats.put("department", s.getDepartment() != null ? s.getDepartment().getDepartmentName() : "N/A");
             stats.put("totalTasks", total);
             stats.put("completedTasks", completed);
-            stats.put("inProgressTasks", inProgress);
             stats.put("completionRate", total > 0 ? (completed * 100.0 / total) : 0);
 
             performance.add(stats);

@@ -56,7 +56,7 @@
     <!-- SEARCH -->
     <div class="mb-3">
         <label class="form-label fw-semibold">Search Supervisor</label>
-        <input type="text" id="searchSupervisor" class="form-control" placeholder="Search by Code...">
+        <input type="text" id="searchSupervisor" class="form-control" placeholder="Search by Code or Name...">
     </div>
 
     <!-- TABLE -->
@@ -124,16 +124,22 @@
     let allSupervisors = [];
     let allBranches = [];
     let allDepartments = [];
+    let allUsers = [];
 
     $(document).ready(function () {
-        $('#branch, #department, #supervisorSelect').select2({ width: '100%' });
+        // Initialize Select2
+        $('#branch, #department, #supervisorSelect').select2({ width: '100%', placeholder: 'Select option' });
 
+        // Load all data first, then load supervisors
         Promise.all([
             loadBranches(),
             loadDepartments(),
-            loadSupervisorsDropdown()
+            loadUsers()
         ]).then(() => {
             loadSupervisors();
+        }).catch(error => {
+            console.error("Error loading initial data:", error);
+            showToast("Error loading data", "error");
         });
 
         $('#branch').on('change', function() {
@@ -143,7 +149,8 @@
         $("#searchSupervisor").on("input", function() {
             const q = $(this).val().toLowerCase();
             const filtered = allSupervisors.filter(s =>
-                s.supervisorCode?.toLowerCase().includes(q)
+                (s.supervisorCode && s.supervisorCode.toLowerCase().includes(q)) ||
+                (s.firstName && `${s.firstName} ${s.otherName || ''}`.toLowerCase().includes(q))
             );
             renderSupervisors(filtered);
         });
@@ -167,21 +174,28 @@
             allBranches = data;
             $("#branch").html('<option value="">Select Branch</option>' +
                 data.map(b => `<option value="${b.branchCode}">${b.branchName}</option>`).join(''));
-        });
+        }).fail(() => showToast("Error loading branches", "error"));
     }
 
     function loadDepartments() {
         return $.get(DEPARTMENT_API).done(data => {
             allDepartments = data;
             $("#department").html('<option value="">Select Department</option>');
-        });
+        }).fail(() => showToast("Error loading departments", "error"));
+    }
+
+    function loadUsers() {
+        return $.get(USER_API).done(data => {
+            allUsers = data;
+            console.log("Users loaded:", allUsers.length);
+        }).fail(() => showToast("Error loading users", "error"));
     }
 
     function filterDepartments(branchCode) {
         let options = '<option value="">Select Department</option>';
 
         const filtered = branchCode
-            ? allDepartments.filter(d => d.branch?.branchCode === branchCode)
+            ? allDepartments.filter(d => d.branch && d.branch.branchCode === branchCode)
             : allDepartments;
 
         filtered.forEach(d => {
@@ -192,24 +206,27 @@
     }
 
     function loadSupervisorsDropdown() {
-        return $.get(USER_API).done(data => {
-            const supervisors = data.filter(u => u.role === "SUPERVISOR");
+        // ✅ ONLY get users with role SUPERVISOR (not ADMIN)
+        const supervisors = allUsers.filter(u => u.role === "SUPERVISOR");
 
-            let options = '<option value="">Select Supervisor</option>';
-            supervisors.forEach(s => {
-                options += `<option value="${s.staffId}">
-                    ${s.firstName} ${s.otherName || ''}
-                </option>`;
-            });
+        console.log("Supervisors for dropdown (only SUPERVISOR role):", supervisors.length);
 
-            $("#supervisorSelect").html(options).trigger('change');
+        // ✅ SHOW ONLY SUPERVISOR NAME - NO BRANCH/DEPARTMENT
+        let options = '<option value="">Select Supervisor</option>';
+        supervisors.forEach(s => {
+            let supervisorName = `${s.firstName || ''} ${s.otherName || ''}`.trim();
+            options += `<option value="${s.staffId}">${supervisorName}</option>`;
         });
+
+        $("#supervisorSelect").html(options).trigger('change');
     }
 
     function loadSupervisors() {
         $.get(API).done(data => {
             allSupervisors = data;
+            console.log("Supervisors loaded:", allSupervisors.length);
             renderSupervisors(allSupervisors);
+            loadSupervisorsDropdown(); // Refresh dropdown with branch/dept info
         }).fail(() => showToast("Error loading supervisors", "error"));
     }
 
@@ -224,9 +241,23 @@
 
         let rows = "";
         supervisors.forEach(s => {
+            // Format supervisor name with branch and department abbreviations
+            let supervisorName = `${s.firstName || ''} ${s.otherName || ''}`.trim();
+            let branchAbbr = s.branchName ? s.branchName.substring(0, 3).toUpperCase() : '';
+            let deptAbbr = s.departmentName ? s.departmentName.substring(0, 3).toUpperCase() : '';
+
+            let formattedName = supervisorName;
+            if (branchAbbr && deptAbbr) {
+                formattedName = `${supervisorName} - ${branchAbbr} - ${deptAbbr}`;
+            } else if (branchAbbr) {
+                formattedName = `${supervisorName} - ${branchAbbr}`;
+            } else if (deptAbbr) {
+                formattedName = `${supervisorName} - ${deptAbbr}`;
+            }
+
             rows += `<tr>
                 <td>${s.supervisorCode || 'N/A'}</td>
-                <td>${s.firstName || ''} ${s.otherName || ''}</td>
+                <td>${formattedName}</td>
                 <td>${s.departmentName || 'N/A'}</td>
                 <td>${s.branchName || 'N/A'}</td>
                 <td>${s.createdAt ? new Date(s.createdAt).toLocaleDateString() : 'N/A'}</td>
@@ -234,8 +265,8 @@
                     <button class="btn btn-sm btn-primary" onclick="viewSupervisor('${s.supervisorCode}')">View</button>
                     <button class="btn btn-sm btn-warning" onclick="editSupervisor('${s.supervisorCode}')">Edit</button>
                     <button class="btn btn-sm btn-danger" onclick="openDeleteModal('${s.supervisorCode}')">Delete</button>
-                </td>
-            </tr>`;
+                 </td>
+             </tr>`;
         });
 
         $("#supervisorTable").html(rows);
@@ -248,13 +279,13 @@
         const supervisorCode = $('#supervisorCode').val();
 
         if (!branchCode || !departmentCode || !staffId) {
-            showToast("Fill all fields", "error");
+            showToast("Please fill all fields", "error");
             return;
         }
 
         const data = {
-            branchCode,
-            departmentCode,
+            branchCode: branchCode,
+            departmentCode: departmentCode,
             staffId: parseInt(staffId)
         };
 
@@ -265,23 +296,26 @@
             type: isUpdate ? 'PUT' : 'POST',
             contentType: "application/json",
             data: JSON.stringify(data),
-            success: function() {
+            success: function(response) {
                 showToast(isUpdate ? "Updated successfully!" : "Saved successfully!", "success");
                 resetForm();
-                loadSupervisors();
+                loadSupervisors(); // Reload to refresh table and dropdown
             },
             error: function(xhr) {
-                showToast(xhr.responseText || "Error occurred", "error");
+                let errorMsg = xhr.responseText || "Error occurred";
+                showToast(errorMsg, "error");
             }
         });
     }
 
     function editSupervisor(code) {
         const s = allSupervisors.find(x => x.supervisorCode === code);
-        if (!s) return;
+        if (!s) {
+            showToast("Supervisor not found", "error");
+            return;
+        }
 
         $('#supervisorCode').val(s.supervisorCode);
-
         $('#branch').val(s.branchCode).trigger('change');
 
         filterDepartments(s.branchCode);
@@ -291,15 +325,28 @@
             $('#supervisorSelect').val(String(s.staffId)).trigger('change');
         }, 100);
 
-        showToast("Edit mode: Update and click Save", "info");
+        showToast(`Editing: ${s.firstName} ${s.otherName || ''}`, "info");
     }
 
     function viewSupervisor(code) {
         const s = allSupervisors.find(x => x.supervisorCode === code);
         if (!s) return;
 
+        let supervisorName = `${s.firstName || ''} ${s.otherName || ''}`.trim();
+        let branchAbbr = s.branchName ? s.branchName.substring(0, 3).toUpperCase() : '';
+        let deptAbbr = s.departmentName ? s.departmentName.substring(0, 3).toUpperCase() : '';
+
+        let formattedName = supervisorName;
+        if (branchAbbr && deptAbbr) {
+            formattedName = `${supervisorName} - ${branchAbbr} - ${deptAbbr}`;
+        } else if (branchAbbr) {
+            formattedName = `${supervisorName} - ${branchAbbr}`;
+        } else if (deptAbbr) {
+            formattedName = `${supervisorName} - ${deptAbbr}`;
+        }
+
         $('#viewCode').text(s.supervisorCode);
-        $('#viewSupervisorName').text(`${s.firstName || ''} ${s.otherName || ''}`);
+        $('#viewSupervisorName').text(formattedName);
         $('#viewDepartment').text(s.departmentName || 'N/A');
         $('#viewBranch').text(s.branchName || 'N/A');
         $('#viewCreatedAt').text(
@@ -316,16 +363,15 @@
         new bootstrap.Modal('#deleteModal').show();
     }
 
-    // ✅ FIXED DELETE
     $('#confirmDeleteBtn').click(function() {
         if (!supervisorToDelete) return;
 
         $.ajax({
-            url: `${API}/${supervisorToDelete}`, // ✅ CORRECT
+            url: `${API}/${supervisorToDelete}`,
             type: 'DELETE',
             success: function() {
                 showToast("Deleted successfully", "success");
-                loadSupervisors();
+                loadSupervisors(); // Reload the list
                 bootstrap.Modal.getInstance(document.getElementById('deleteModal')).hide();
                 supervisorToDelete = null;
             },
@@ -336,7 +382,7 @@
     });
 
     function showToast(msg, type='success') {
-        const bgColor = type === 'success' ? '#161E54' : '#E76F51';
+        const bgColor = type === 'success' ? '#161E54' : (type === 'error' ? '#E76F51' : '#F39C12');
 
         const toast = $(`
             <div class="toast text-white mb-2" style="background:${bgColor}">

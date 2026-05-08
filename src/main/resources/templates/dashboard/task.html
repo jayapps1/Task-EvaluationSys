@@ -56,6 +56,14 @@
             border-radius: 5px;
         }
 
+        .info-box {
+            background-color: #E8F4FD;
+            border-left: 4px solid #3498db;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+        }
+
         .description-cell {
             max-width: 150px;
             white-space: nowrap;
@@ -69,6 +77,16 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+        }
+
+        .deadline-info {
+            font-size: 12px;
+            margin-top: 5px;
+            color: #666;
+        }
+
+        .deadline-info i {
+            margin-right: 5px;
         }
     </style>
 </head>
@@ -84,12 +102,19 @@
         <form id="taskForm">
             <input type="hidden" id="taskId">
 
-            <!-- Warning message for non-editable tasks -->
             <div id="editWarning" class="warning-box" style="display: none;">
                 <i class="fas fa-lock"></i>
                 <strong>Task Cannot Be Edited</strong><br>
                 This task has status: <span id="currentTaskStatus"></span>.
                 Tasks can only be edited when status is <strong>INITIATED</strong>.
+            </div>
+
+            <div id="quarterInfo" class="info-box">
+                <i class="fas fa-calendar-alt"></i>
+                <strong>Current Quarter Information</strong><br>
+                Current date: <strong><span id="currentDateDisplay"></span></strong><br>
+                Current quarter: <strong><span id="currentQuarterDisplay"></span></strong><br>
+                <span id="deadlineRequirement" style="color: #2c3e50;"></span>
             </div>
 
             <div class="row g-3">
@@ -119,18 +144,27 @@
                 </div>
 
                 <div class="col-md-6">
-                    <label class="fw-bold">Quarter</label>
-                    <select id="quarter" class="form-control">
-                        <option value="Q1">Q1</option>
-                        <option value="Q2">Q2</option>
-                        <option value="Q3">Q3</option>
-                        <option value="Q4">Q4</option>
+                    <label class="fw-bold">Quarter <span class="text-danger">*</span></label>
+                    <select id="quarter" class="form-control" disabled>
+                        <option value="">Loading...</option>
                     </select>
+                    <small class="text-muted">Automatically set to current quarter - cannot be changed</small>
                 </div>
             </div>
 
-            <input type="text" id="description" class="form-control mt-3" placeholder="Description">
-            <input type="datetime-local" id="deadline" class="form-control mt-2">
+            <div class="mt-3">
+                <label class="fw-bold">Description <span class="text-danger">*</span></label>
+                <textarea id="description" class="form-control" rows="3" placeholder="Enter task description..."></textarea>
+            </div>
+
+            <div class="mt-3">
+                <label class="fw-bold">Deadline <span class="text-danger">*</span></label>
+                <input type="datetime-local" id="deadline" class="form-control" required>
+                <div class="deadline-info">
+                    <i class="fas fa-info-circle"></i>
+                    Deadline must be within the current quarter: <span id="quarterDateRange"></span>
+                </div>
+            </div>
 
             <div class="d-flex mt-3 gap-2">
                 <button type="submit" class="btn btn-primary flex-grow-1" id="saveBtn">Save</button>
@@ -213,7 +247,6 @@
 
         const deleteModal = new bootstrap.Modal(document.getElementById('deleteTaskModal'));
 
-        // ✅ COMPLETE STATUS MAP
         const statusMap = {
             "ASSIGNED": "Assigned",
             "INITIATED": "Initiated",
@@ -225,26 +258,74 @@
             "APPROVED": "Approved"
         };
 
-        const quarterMap = {
-            "Q1": "Q1",
-            "Q2": "Q2",
-            "Q3": "Q3",
-            "Q4": "Q4"
-        };
+        function getCurrentQuarter() {
+            const now = new Date();
+            const month = now.getMonth() + 1;
+            if (month >= 1 && month <= 3) return "Q1";
+            if (month >= 4 && month <= 6) return "Q2";
+            if (month >= 7 && month <= 9) return "Q3";
+            return "Q4";
+        }
 
-        // ✅ WORKFLOW: Allowed next statuses
-        const allowedNextStatuses = {
-            "ASSIGNED": ["INITIATED"],
-            "INITIATED": ["IN_PROGRESS"],
-            "IN_PROGRESS": ["COMPLETED"],
-            "COMPLETED": ["PENDING_REVIEW"],
-            "PENDING_REVIEW": ["PENDING_APPROVAL", "APPROVED", "REJECTED"],
-            "PENDING_APPROVAL": ["APPROVED", "REJECTED"],
-            "REJECTED": ["IN_PROGRESS"],
-            "APPROVED": []
-        };
+        function getQuarterBoundaries(quarter, year) {
+            const boundaries = {
+                "Q1": { start: `${year}-01-01`, end: `${year}-03-31`, startLabel: "Jan 1", endLabel: "Mar 31" },
+                "Q2": { start: `${year}-04-01`, end: `${year}-06-30`, startLabel: "Apr 1", endLabel: "Jun 30" },
+                "Q3": { start: `${year}-07-01`, end: `${year}-09-30`, startLabel: "Jul 1", endLabel: "Sep 30" },
+                "Q4": { start: `${year}-10-01`, end: `${year}-12-31`, startLabel: "Oct 1", endLabel: "Dec 31" }
+            };
+            return boundaries[quarter];
+        }
 
-        // ✅ Helper function to truncate text
+        function getQuarterDateRange(quarter, year) {
+            const boundaries = getQuarterBoundaries(quarter, year);
+            return `${boundaries.startLabel} to ${boundaries.endLabel}, ${year}`;
+        }
+
+        function setupStrictQuarter() {
+            const now = new Date();
+            const currentYear = now.getFullYear();
+            const currentQuarter = getCurrentQuarter();
+            const quarterRange = getQuarterDateRange(currentQuarter, currentYear);
+            const boundaries = getQuarterBoundaries(currentQuarter, currentYear);
+
+            const quarterSelect = $("#quarter");
+            quarterSelect.empty();
+            quarterSelect.append(`<option value="${currentQuarter}" selected>${currentQuarter} - ${quarterRange}</option>`);
+            quarterSelect.prop('disabled', true);
+
+            $('#currentQuarterDisplay').text(`${currentQuarter} - ${quarterRange}`);
+            $('#quarterDateRange').text(quarterRange);
+            $('#deadlineRequirement').html(`<i class="fas fa-clock"></i> Deadline must be between <strong>${boundaries.start}</strong> and <strong>${boundaries.end}</strong>`);
+
+            const deadlineInput = $("#deadline");
+            deadlineInput.attr('min', boundaries.start + 'T00:00');
+            deadlineInput.attr('max', boundaries.end + 'T23:59');
+
+            deadlineInput.off('change').on('change', function() {
+                const deadlineValue = $(this).val();
+                if (deadlineValue) {
+                    const deadlineDate = new Date(deadlineValue);
+                    const startDate = new Date(boundaries.start + 'T00:00');
+                    const endDate = new Date(boundaries.end + 'T23:59');
+
+                    if (deadlineDate < startDate) {
+                        showToast(`Deadline cannot be before ${boundaries.start}`, "error");
+                        $(this).val('');
+                    } else if (deadlineDate > endDate) {
+                        showToast(`Deadline cannot be after ${boundaries.end}`, "error");
+                        $(this).val('');
+                    }
+                }
+            });
+
+            return { currentYear, currentQuarter, boundaries };
+        }
+
+        function getCurrentYear() {
+            return new Date().getFullYear();
+        }
+
         function truncateText(text, maxLength = 20) {
             if (!text) return '';
             if (text.length <= maxLength) return text;
@@ -259,23 +340,17 @@
             toast.on('hidden.bs.toast', () => toast.remove());
         }
 
-        // Check if task can be edited (only INITIATED status)
         function canEditTask(taskStatus) {
             return taskStatus === 'INITIATED';
         }
 
-        // Check if status is final
-        function isFinalStatus(status) {
-            return status === 'APPROVED' || status === 'COMPLETED';
-        }
-
-        // Enable/disable form fields based on edit permission
         function setFormEditable(editable) {
-            const formFields = ['#description', '#deadline', '#quarter', '#supervisorId', '#createdByCode'];
+            const formFields = ['#description', '#deadline', '#supervisorId', '#createdByCode'];
             formFields.forEach(field => {
                 $(field).prop('disabled', !editable);
             });
 
+            $('#quarter').prop('disabled', true);
             $('#taskStatus').prop('disabled', true);
 
             if (editable) {
@@ -289,45 +364,49 @@
             }
         }
 
-        // Reset form to default state
         function resetFormToDefault() {
             $("#taskForm")[0].reset();
             $('#supervisorId, #createdByCode').val(null).trigger('change');
             $("#taskStatus").val("INITIATED");
-            $("#quarter").val("Q1");
+            setupStrictQuarter();
             $("#taskId").val('');
             currentEditTaskStatus = null;
             setFormEditable(true);
             $('#editWarning').hide();
         }
 
-        function getSupervisorNameById(supervisorId){
-            if(!supervisorId || supervisorId === 'N/A' || supervisorId === 'null') return 'N/A';
-
-            const supervisorIdStr = supervisorId.toString();
-            const supervisor = allSupervisors.find(s => {
-                return s.supervisorId && s.supervisorId.toString() === supervisorIdStr;
-            });
-
-            if(supervisor) {
-                if(supervisor.user && supervisor.user.firstName) {
-                    return `${supervisor.user.firstName} ${supervisor.user.otherName || ''}`.trim();
-                }
-                if(supervisor.staffCode) {
-                    const user = allUsers.find(u => u.staffCode === supervisor.staffCode);
-                    if(user) {
-                        return `${user.firstName} ${user.otherName || ''}`.trim();
-                    }
-                }
-                return supervisor.supervisorCode || 'N/A';
-            }
-            return 'N/A';
+        // Helper function to get abbreviation (first 3 characters uppercase)
+        function getAbbreviation(text) {
+            if (!text) return '';
+            return text.substring(0, 3).toUpperCase();
         }
 
-        function getUserNameByCode(code){
-            if(!code) return 'N/A';
-            const user = allUsers.find(u => u.staffCode && u.staffCode.toString() === code.toString());
-            return user ? `${user.firstName} ${user.otherName || ''}`.trim() : 'N/A';
+        function getSupervisorDisplay(supervisor) {
+            // Get name from supervisor response
+            let name = '';
+            if (supervisor.firstName) {
+                name = `${supervisor.firstName} ${supervisor.otherName || ''}`.trim();
+            } else {
+                name = supervisor.supervisorCode || `Supervisor ${supervisor.supervisorId}`;
+            }
+
+            // Get branch and department names from the response (already in SupervisorDTOResponse)
+            let branchName = supervisor.branchName || '';
+            let deptName = supervisor.departmentName || '';
+
+            let branchAbbr = getAbbreviation(branchName);
+            let deptAbbr = getAbbreviation(deptName);
+
+            let displayText = name;
+            if (branchAbbr && deptAbbr) {
+                displayText = `${name} - ${branchAbbr} - ${deptAbbr}`;
+            } else if (branchAbbr) {
+                displayText = `${name} - ${branchAbbr}`;
+            } else if (deptAbbr) {
+                displayText = `${name} - ${deptAbbr}`;
+            }
+
+            return displayText;
         }
 
         function loadUsersAndSupervisors() {
@@ -338,8 +417,6 @@
                 allUsers = data;
 
                 const adminUsers = allUsers.filter(u => u.role === "ADMIN" || u.role === "admin");
-                console.log("Admin users for dropdown:", adminUsers);
-
                 $("#createdByCode").html('<option></option>' +
                     adminUsers.map(u => `<option value="${u.staffCode}">${u.firstName} ${u.otherName || ''}</option>`).join(''));
             }).then(() => {
@@ -347,30 +424,33 @@
                     console.log("Supervisors loaded:", data);
                     allSupervisors = data;
 
-                    const userMap = new Map();
-                    allUsers.forEach(u => {
-                        userMap.set(u.staffCode, `${u.firstName} ${u.otherName || ''}`.trim());
-                    });
-
+                    // Build supervisor dropdown with formatted display
                     $("#supervisorId").html('<option></option>' +
                         allSupervisors.map(s => {
-                            let name = '';
-                            if(s.user && s.user.firstName) {
-                                name = `${s.user.firstName} ${s.user.otherName || ''}`.trim();
-                            }
-                            else if(s.staffCode && userMap.has(s.staffCode)) {
-                                name = userMap.get(s.staffCode);
-                            }
-                            else if(s.supervisorName) {
-                                name = s.supervisorName;
-                            }
-                            else {
-                                name = s.supervisorCode;
-                            }
-                            return `<option value="${s.supervisorId}">${name}</option>`;
+                            let displayText = getSupervisorDisplay(s);
+                            return `<option value="${s.supervisorId}">${displayText}</option>`;
                         }).join(''));
+
+                    // Refresh Select2
+                    $('#supervisorId').trigger('change');
                 });
             });
+        }
+
+        function getSupervisorNameById(supervisorId) {
+            if (!supervisorId || supervisorId === 'N/A' || supervisorId === 'null') return 'N/A';
+
+            const supervisor = allSupervisors.find(s => s.supervisorId == supervisorId);
+            if (supervisor) {
+                return getSupervisorDisplay(supervisor);
+            }
+            return 'N/A';
+        }
+
+        function getUserNameByCode(code){
+            if(!code) return 'N/A';
+            const user = allUsers.find(u => u.staffCode && u.staffCode.toString() === code.toString());
+            return user ? `${user.firstName} ${user.otherName || ''}`.trim() : 'N/A';
         }
 
         function loadTasks(page = 1){
@@ -391,7 +471,7 @@
         function renderTable(){
             let rows = "";
             if(allTasks.length === 0){
-                rows = `<tr><td colspan="7" class="text-center">No tasks found</td></tr>`;
+                rows = `<tr><td colspan="7" class="text-center">No tasks found</td><td>`;
             } else {
                 allTasks.forEach(t => {
                     const supervisorName = getSupervisorNameById(t.supervisorCode);
@@ -400,8 +480,6 @@
                     const editDisabledClass = !canEdit ? 'edit-disabled' : '';
                     const editTitle = !canEdit ? 'Tasks can only be edited when status is INITIATED' : 'Edit task';
                     const statusDisplay = statusMap[t.taskStatus] || t.taskStatus;
-
-                    // ✅ Truncate description to 20 characters
                     const shortDesc = truncateText(t.description, 20);
                     const fullDesc = t.description || '';
 
@@ -411,16 +489,10 @@
                         <td>${supervisorName}</td>
                         <td>${createdByName}</td>
                         <td><span class="status-badge status-${t.taskStatus}">${statusDisplay}</span></td>
-                        <td>${quarterMap[t.quarter] ?? ''}</td>
+                        <td>${t.quarter ?? ''}</td>
                         <td>
                             <button class="btn btn-primary btn-sm view-btn" data-id="${t.taskId}"><i class="fas fa-eye"></i></button>
-                            <button class="btn btn-warning btn-sm edit-btn ${editDisabledClass}"
-                                    data-id="${t.taskId}"
-                                    data-status="${t.taskStatus}"
-                                    ${!canEdit ? 'disabled' : ''}
-                                    title="${editTitle}">
-                                <i class="fas fa-edit"></i>
-                            </button>
+                            <button class="btn btn-warning btn-sm edit-btn ${editDisabledClass}" data-id="${t.taskId}" data-status="${t.taskStatus}" ${!canEdit ? 'disabled' : ''} title="${editTitle}"><i class="fas fa-edit"></i></button>
                             <button class="btn btn-danger btn-sm delete-btn" data-id="${t.taskId}"><i class="fas fa-trash"></i></button>
                         </td>
                     </tr>`;
@@ -501,7 +573,8 @@
                 <p><b>Supervisor:</b> ${getSupervisorNameById(t.supervisorCode)}</p>
                 <p><b>Created By:</b> ${getUserNameByCode(t.createdByStaffCode)}</p>
                 <p><b>Status:</b> <span class="status-badge status-${t.taskStatus}">${statusMap[t.taskStatus] ?? t.taskStatus}</span></p>
-                <p><b>Quarter:</b> ${quarterMap[t.quarter] ?? ''}</p>
+                <p><b>Quarter:</b> ${t.quarter ?? ''}</p>
+                <p><b>Year:</b> ${t.year || getCurrentYear()}</p>
                 <p><b>Deadline:</b> ${t.deadline ? t.deadline.replace('T', ' ') : 'N/A'}</p>
             `);
             new bootstrap.Modal(document.getElementById('viewTaskModal')).show();
@@ -511,7 +584,6 @@
             const taskId = $(this).data('id');
             const taskStatus = $(this).data('status');
             const t = allTasks.find(x => x.taskId == taskId);
-
             if(!t) return;
 
             if (!canEditTask(taskStatus)) {
@@ -525,7 +597,6 @@
             $("#supervisorId").val(t.supervisorCode).trigger('change');
             $("#createdByCode").val(t.createdByStaffCode).trigger('change');
             $("#taskStatus").val(t.taskStatus);
-            $("#quarter").val(t.quarter);
 
             currentEditTaskStatus = t.taskStatus;
             setFormEditable(true);
@@ -542,13 +613,34 @@
                 return;
             }
 
+            const { currentYear, currentQuarter, boundaries } = setupStrictQuarter();
+            const deadline = $("#deadline").val();
+
+            if (deadline) {
+                const deadlineDate = new Date(deadline);
+                const startDate = new Date(boundaries.start + 'T00:00');
+                const endDate = new Date(boundaries.end + 'T23:59');
+
+                if (deadlineDate < startDate || deadlineDate > endDate) {
+                    showToast(`Deadline must be within the current quarter (${boundaries.start} to ${boundaries.end})`, "error");
+                    return;
+                }
+            }
+
+            const description = $("#description").val();
+            if (!description || description.trim() === '') {
+                showToast("Description is required", "error");
+                return;
+            }
+
             const data = {
-                description: $("#description").val(),
+                description: description.trim(),
                 supervisorId: parseInt($("#supervisorId").val()),
                 createdByCode: parseInt($("#createdByCode").val()),
                 taskStatus: taskStatus,
-                quarter: $("#quarter").val(),
-                deadline: $("#deadline").val()
+                quarter: currentQuarter,
+                deadline: deadline,
+                year: currentYear
             };
 
             console.log("Saving data:", data);
@@ -565,7 +657,20 @@
                 },
                 error: function(xhr){
                     console.error("Error:", xhr.responseText);
-                    showToast("Save failed: " + (xhr.responseText || "Unknown error"), "error");
+                    let errorMessage = "Save failed: ";
+                    try {
+                        const errorResponse = JSON.parse(xhr.responseText);
+                        if (errorResponse.message) {
+                            errorMessage += errorResponse.message;
+                        } else if (errorResponse.errors) {
+                            errorMessage += Object.values(errorResponse.errors).join(", ");
+                        } else {
+                            errorMessage += xhr.responseText;
+                        }
+                    } catch(e) {
+                        errorMessage += xhr.responseText;
+                    }
+                    showToast(errorMessage, "error");
                 }
             });
         });
@@ -574,7 +679,19 @@
             resetFormToDefault();
         });
 
-        // Start the application
+        function updateDateDisplay() {
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+            $('#currentDateDisplay').text(dateStr);
+        }
+
+        updateDateDisplay();
+        setupStrictQuarter();
+
         $.when(loadUsersAndSupervisors()).then(() => {
             console.log("Users and supervisors loaded, now loading tasks...");
             loadTasks(1);

@@ -8,6 +8,7 @@ public class EvaluationDTOResponse {
     private String evaluationCode;
     private Long taskId;
     private Long supervisorId;
+    private Long staffId;        // ✅ Add this
     private Double score;
     private String remarks;
     private LocalDateTime evaluationDate;
@@ -44,6 +45,14 @@ public class EvaluationDTOResponse {
 
     public void setSupervisorId(Long supervisorId) {
         this.supervisorId = supervisorId;
+    }
+
+    public Long getStaffId() {
+        return staffId;
+    }
+
+    public void setStaffId(Long staffId) {
+        this.staffId = staffId;
     }
 
     public Double getScore() {

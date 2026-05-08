@@ -3,15 +3,20 @@ package com.evaluationsys.taskevaluationsys.controller;
 import com.evaluationsys.taskevaluationsys.dto.TaskDTO;
 import com.evaluationsys.taskevaluationsys.dtoresponse.TaskDTOResponse;
 import com.evaluationsys.taskevaluationsys.service.TaskService;
+import jakarta.validation.Valid;
 import org.springframework.data.domain.*;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 
-import jakarta.validation.Valid;
 import java.net.URI;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/tasks")
@@ -64,24 +69,35 @@ public class TaskController {
     }
 
     // ===============================
-    // CREATE TASK
+    // CREATE TASK - WITH VALIDATION ERROR HANDLING
     // ===============================
     @PostMapping
-    public ResponseEntity<TaskDTOResponse> createTask(
-            @Valid @RequestBody TaskDTO dto) {
-
-        TaskDTOResponse created = taskService.createTask(dto);
-
-        return ResponseEntity
-                .created(URI.create("/tasks/id/" + created.getTaskId()))
-                .body(created);
+    public ResponseEntity<?> createTask(@Valid @RequestBody TaskDTO dto) {
+        try {
+            TaskDTOResponse created = taskService.createTask(dto);
+            return ResponseEntity
+                    .created(URI.create("/tasks/id/" + created.getTaskId()))
+                    .body(created);
+        } catch (IllegalArgumentException e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("status", "error");
+            errorResponse.put("message", e.getMessage());
+            errorResponse.put("timestamp", LocalDateTime.now());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+        } catch (RuntimeException e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("status", "error");
+            errorResponse.put("message", e.getMessage());
+            errorResponse.put("timestamp", LocalDateTime.now());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+        }
     }
 
     // ===============================
     // UPDATE TASK
     // ===============================
     @PutMapping("/id/{taskId}")
-    public ResponseEntity<TaskDTOResponse> updateTask(
+    public ResponseEntity<?> updateTask(
             @PathVariable Long taskId,
             @Valid @RequestBody TaskDTO dto) {
 
@@ -121,5 +137,30 @@ public class TaskController {
         }
 
         return ResponseEntity.ok(tasks);
+    }
+
+    // ===============================
+    // HANDLE VALIDATION ERRORS
+    // ===============================
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<Map<String, Object>> handleValidationExceptions(
+            MethodArgumentNotValidException ex) {
+
+        Map<String, String> fieldErrors = ex.getBindingResult()
+                .getAllErrors()
+                .stream()
+                .collect(Collectors.toMap(
+                        error -> ((FieldError) error).getField(),
+                        error -> error.getDefaultMessage(),
+                        (existing, replacement) -> existing
+                ));
+
+        Map<String, Object> errorResponse = new HashMap<>();
+        errorResponse.put("status", "error");
+        errorResponse.put("message", "Validation failed");
+        errorResponse.put("errors", fieldErrors);
+        errorResponse.put("timestamp", LocalDateTime.now());
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
     }
 }

@@ -28,13 +28,17 @@ public class BranchService {
         return branchRepository.findByBranchCode(branchCode);
     }
 
-    // CREATE
+    // CREATE - Modernized to generate numeric codes
     public Branch createBranch(Branch branch) {
 
         String locationPrefix = getPrefix(branch.getLocation());
         String branchPrefix = getPrefix(branch.getBranchName());
 
-        String prefix = locationPrefix + "/" + branchPrefix;
+        // Convert letter prefixes to numbers (A=1, B=2, etc.)
+        String locationNum = convertToNumbers(locationPrefix);
+        String branchNum = convertToNumbers(branchPrefix);
+
+        String prefix = locationNum + branchNum;
 
         int nextNumber = 1;
 
@@ -42,12 +46,14 @@ public class BranchService {
                 branchRepository.findTopByBranchCodeStartingWithOrderByBranchCodeDesc(prefix);
 
         if (lastBranch.isPresent()) {
-            String lastCode = lastBranch.get().getBranchCode(); // ACC/MAN/002
-            String[] parts = lastCode.split("/");
-            nextNumber = Integer.parseInt(parts[2]) + 1;
+            String lastCode = lastBranch.get().getBranchCode(); // e.g., "120103001"
+            // Extract the sequence part (last 4 digits)
+            String sequencePart = lastCode.substring(prefix.length());
+            nextNumber = Integer.parseInt(sequencePart) + 1;
         }
 
-        String newCode = prefix + "/" + String.format("%03d", nextNumber);
+        // Generate code: LocationNum(6) + BranchNum(6) + Sequence(4)
+        String newCode = prefix + String.format("%04d", nextNumber);
         branch.setBranchCode(newCode);
 
         return branchRepository.save(branch);
@@ -61,6 +67,17 @@ public class BranchService {
     // DELETE
     public void deleteBranch(Branch branch) {
         branchRepository.delete(branch);
+    }
+
+    // Convert letters to numbers: A=01, B=02, etc.
+    private String convertToNumbers(String text) {
+        StringBuilder numbers = new StringBuilder();
+        for (char c : text.toUpperCase().toCharArray()) {
+            if (c >= 'A' && c <= 'Z') {
+                numbers.append(String.format("%02d", c - 'A' + 1));
+            }
+        }
+        return numbers.toString();
     }
 
     // helper method

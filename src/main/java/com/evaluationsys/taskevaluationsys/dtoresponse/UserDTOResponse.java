@@ -10,89 +10,52 @@ public class UserDTOResponse {
     private String phoneNumber;
     private String role;
     private String rank;
+
+    // ✅ ADD THESE FIELDS (needed for filtering)
+    private Long departmentId;
     private String departmentName;
+    private Long branchId;
     private String branchName;
+
     private Boolean active;
 
+    // Getters and Setters
+    public Long getStaffId() { return staffId; }
+    public void setStaffId(Long staffId) { this.staffId = staffId; }
 
+    public Long getStaffCode() { return staffCode; }
+    public void setStaffCode(Long staffCode) { this.staffCode = staffCode; }
 
-    public Long getStaffId() {
-        return staffId;
-    }
-    public void setStaffId(Long staffId) {
-        this.staffId = staffId;
-    }
+    public String getFirstName() { return firstName; }
+    public void setFirstName(String firstName) { this.firstName = firstName; }
 
-    public Long getStaffCode() {return staffCode;}
-    public void setStaffCode(Long staffCode) {this.staffCode = staffCode;}
+    public String getOtherName() { return otherName; }
+    public void setOtherName(String otherName) { this.otherName = otherName; }
 
-    public String getFirstName() {
-        return firstName;
-    }
-    public void setFirstName(String firstName) {
-        this.firstName = firstName;
-    }
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
 
-    public String getOtherName() {
-        return otherName;
-    }
-    public void setOtherName(String otherName) {
-        this.otherName = otherName;
-    }
+    public String getPhoneNumber() { return phoneNumber; }
+    public void setPhoneNumber(String phoneNumber) { this.phoneNumber = phoneNumber; }
 
-    public String getEmail() {
-        return email;
-    }
-    public void setEmail(String email) {
-        this.email = email;
-    }
+    public String getRole() { return role; }
+    public void setRole(String role) { this.role = role; }
 
-    public String getPhoneNumber() {
-        return phoneNumber;
-    }
-    public void setPhoneNumber(String phoneNumber) {
-        this.phoneNumber = phoneNumber;
-    }
+    public String getRank() { return rank; }
+    public void setRank(String rank) { this.rank = rank; }
 
-    public String getRole() {
-        return role;
-    }
+    public Long getDepartmentId() { return departmentId; }
+    public void setDepartmentId(Long departmentId) { this.departmentId = departmentId; }
 
-    public void setRole(String role) {
-        this.role = role;
-    }
+    public String getDepartmentName() { return departmentName; }
+    public void setDepartmentName(String departmentName) { this.departmentName = departmentName; }
 
-    public String getRank() {
-        return rank;
-    }
+    public Long getBranchId() { return branchId; }
+    public void setBranchId(Long branchId) { this.branchId = branchId; }
 
-    public void setRank(String rank) {
-        this.rank = rank;
-    }
+    public String getBranchName() { return branchName; }
+    public void setBranchName(String branchName) { this.branchName = branchName; }
 
-    public String getDepartmentName() {
-        return departmentName;
-    }
-
-    public void setDepartmentName(String departmentName) {
-        this.departmentName = departmentName;
-    }
-
-    public String getBranchName() {
-        return branchName;
-    }
-
-    public void setBranchName(String branchName) {
-        this.branchName = branchName;
-    }
-
-    public Boolean getActive() {
-        return active;
-    }
-
-    public void setActive(Boolean active) {
-        this.active = active;
-    }
-
-
+    public Boolean getActive() { return active; }
+    public void setActive(Boolean active) { this.active = active; }
 }

@@ -53,4 +53,8 @@ public interface BranchRepository extends JpaRepository<Branch, Long> {
 
     @Query("SELECT b.branchName, COUNT(u) FROM Branch b LEFT JOIN User u ON u.branch.branchId = b.branchId AND u.role = 'STAFF' GROUP BY b.branchName")
     List<Object[]> getStaffCountByBranch();
+
+
+
+
 }

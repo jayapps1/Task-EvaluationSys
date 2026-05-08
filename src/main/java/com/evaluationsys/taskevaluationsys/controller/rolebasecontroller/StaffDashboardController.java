@@ -3,11 +3,12 @@ package com.evaluationsys.taskevaluationsys.controller.rolebasecontroller;
 import com.evaluationsys.taskevaluationsys.dtoresponse.TaskAssignmentDTOResponse;
 import com.evaluationsys.taskevaluationsys.entity.User;
 import com.evaluationsys.taskevaluationsys.entity.Supervisor;
+import com.evaluationsys.taskevaluationsys.entity.TaskAssignment;
 import com.evaluationsys.taskevaluationsys.entity.enums.TaskStatus;
 import com.evaluationsys.taskevaluationsys.security.CustomUserDetails;
 import com.evaluationsys.taskevaluationsys.service.staff.StaffTaskService;
 import com.evaluationsys.taskevaluationsys.service.staff.StaffTaskStatistics;
-import com.evaluationsys.taskevaluationsys.service.SupervisorService;
+import com.evaluationsys.taskevaluationsys.repository.TaskAssignmentRepository;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -32,7 +33,7 @@ public class StaffDashboardController {
     private StaffTaskService staffTaskService;
 
     @Autowired
-    private SupervisorService supervisorService;
+    private TaskAssignmentRepository taskAssignmentRepository;
 
     // =========================
     // DASHBOARD
@@ -61,10 +62,10 @@ public class StaffDashboardController {
 
         model.addAttribute("staff", authenticatedUser);
         model.addAttribute("staffCode", staffCode);
-        model.addAttribute("staffId", staffId);  // ✅ ADD staffId for API calls
+        model.addAttribute("staffId", staffId);
 
         // =========================
-        // ✅ USE ASSIGNMENTS INSTEAD OF TASKS
+        // ASSIGNMENTS
         // =========================
         List<TaskAssignmentDTOResponse> assignments = staffTaskService.getStaffAssignments(staffId);
         model.addAttribute("assignments", assignments);
@@ -77,32 +78,82 @@ public class StaffDashboardController {
         model.addAttribute("overdueAssignments", overdueAssignments);
 
         // =========================
-        // SUPERVISOR
+        // SUPERVISOR - Get from the staff's tasks
         // =========================
-        Optional<Supervisor> supervisorOpt =
-                supervisorService.findDepartmentSupervisor(authenticatedUser);
-
-        if (supervisorOpt.isPresent()) {
-            User supUser = supervisorOpt.get().getUser();
-
-            Map<String, String> supervisorData = new HashMap<>();
-            supervisorData.put("name",
-                    supUser.getFirstName() + " " + supUser.getOtherName());
-            supervisorData.put("phone", supUser.getPhoneNumber() != null ? supUser.getPhoneNumber() : "N/A");
-
-            model.addAttribute("supervisor", supervisorData);
-        } else {
-            model.addAttribute("supervisor", Map.of(
-                    "name", "No Supervisor Assigned",
-                    "phone", "N/A"
-            ));
-        }
+        Map<String, String> supervisorData = getSupervisorFromStaffTasks(staffId);
+        model.addAttribute("supervisor", supervisorData);
 
         return "staff/index";
     }
 
+
+    /**
+     * Get supervisor information from the staff's assigned tasks
+     * The supervisor who approves the task is shown
+     */
+    private Map<String, String> getSupervisorFromStaffTasks(Long staffId) {
+        Map<String, String> supervisorData = new HashMap<>();
+
+        // Get all task assignments for this staff
+        List<TaskAssignment> assignments = taskAssignmentRepository.findByAssignUser_StaffId(staffId);
+
+        if (assignments.isEmpty()) {
+            supervisorData.put("name", "No Tasks Assigned");
+            supervisorData.put("phone", "N/A");
+            supervisorData.put("email", "N/A");
+            return supervisorData;
+        }
+
+        // Find unique supervisors by USER (staff_id), not by supervisor record ID
+        Map<Long, Supervisor> uniqueSupervisorsByUser = new HashMap<>();
+
+        for (TaskAssignment assignment : assignments) {
+            if (assignment.getTask() != null && assignment.getTask().getSupervisor() != null) {
+                Supervisor supervisor = assignment.getTask().getSupervisor();
+                if (supervisor.getUser() != null) {
+                    Long userStaffId = supervisor.getUser().getStaffId();
+                    if (!uniqueSupervisorsByUser.containsKey(userStaffId)) {
+                        uniqueSupervisorsByUser.put(userStaffId, supervisor);
+                    }
+                }
+            }
+        }
+
+        if (uniqueSupervisorsByUser.isEmpty()) {
+            supervisorData.put("name", "No Supervisor Assigned to Tasks");
+            supervisorData.put("phone", "N/A");
+            supervisorData.put("email", "N/A");
+            return supervisorData;
+        }
+
+        // Get the first supervisor (all should be the same user)
+        Supervisor supervisor = uniqueSupervisorsByUser.values().iterator().next();
+
+        if (supervisor.getUser() != null) {
+            User supUser = supervisor.getUser();
+            String supervisorName = (supUser.getFirstName() != null ? supUser.getFirstName() : "") +
+                    " " +
+                    (supUser.getOtherName() != null ? supUser.getOtherName() : "");
+
+            supervisorData.put("name", supervisorName.trim().isEmpty() ? "Supervisor" : supervisorName.trim());
+            supervisorData.put("phone", supUser.getPhoneNumber() != null ? supUser.getPhoneNumber() : "N/A");
+            supervisorData.put("email", supUser.getEmail() != null ? supUser.getEmail() : "N/A");
+
+            System.out.println("Supervisor found: " + supervisorName);
+            System.out.println("Supervisor phone: " + supUser.getPhoneNumber());
+
+            // REMOVED the (+1 more) code - no longer needed
+        } else {
+            supervisorData.put("name", "Supervisor Found (No User Data)");
+            supervisorData.put("phone", "N/A");
+            supervisorData.put("email", "N/A");
+        }
+
+        return supervisorData;
+    }
+
     // =========================
-    // ✅ ASSIGNMENT ACTIONS (UPDATED TO USE ASSIGNMENT ID)
+    // ASSIGNMENT ACTIONS
     // =========================
     @PostMapping("/assignment/{taskId}/accept")
     @ResponseBody

@@ -1,5 +1,5 @@
-<!doctype html>
-<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<!DOCTYPE html>
+<html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -7,8 +7,6 @@
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="stylesheet" th:href="@{/css/styles.css}">
-    <link rel="stylesheet" th:href="@{/css/quries.css}">
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 
     <style>
@@ -51,11 +49,60 @@
             border-radius: 20px;
             padding: 8px 20px;
         }
+
+        .btn-back:hover {
+            background-color: #0f1442;
+            color: white;
+        }
+
+        .filter-card {
+            background: var(--white);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .status-badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .status-active {
+            background-color: #2ECC71;
+            color: white;
+        }
+
+        .status-inactive {
+            background-color: #E76F51;
+            color: white;
+        }
+
+        .loader {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--deep-navy);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 
 <body>
-<div th:replace="~{layout/navbar :: navbar}"></div>
 
 <div class="container-custom">
     <div class="container-fluid">
@@ -67,28 +114,55 @@
                     <h2><i class="fas fa-users"></i> Staff Management</h2>
                     <p class="text-muted mb-0">View and manage all staff members</p>
                 </div>
-                <a th:href="@{/admin/dashboard}" class="btn btn-back">
+                <a href="/admin/dashboard" class="btn btn-back">
                     <i class="fas fa-arrow-left"></i> Back to Dashboard
                 </a>
             </div>
         </div>
 
-        <!-- Filter Bar -->
-        <div class="row mb-3">
-            <div class="col-md-4">
-                <select id="branchFilter" class="form-select">
-                    <option value="ALL">All Branches</option>
-                    <option th:each="branch : ${branches}" th:value="${branch.branchId}" th:text="${branch.branchName}"></option>
-                </select>
+        <!-- Filter Section -->
+        <div class="filter-card">
+            <div class="row">
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Branch</label>
+                    <select id="branchFilter" class="form-select select2">
+                        <option value="">All Branches</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Department</label>
+                    <select id="departmentFilter" class="form-select select2">
+                        <option value="">All Departments</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Role</label>
+                    <select id="roleFilter" class="form-select select2">
+                        <option value="">All Roles</option>
+                        <option value="STAFF">Staff</option>
+                        <option value="SUPERVISOR">Supervisor</option>
+                        <option value="ADMIN">Admin</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Status</label>
+                    <select id="statusFilter" class="form-select select2">
+                        <option value="">All Status</option>
+                        <option value="true">Active</option>
+                        <option value="false">Inactive</option>
+                    </select>
+                </div>
             </div>
-            <div class="col-md-4">
-                <select id="departmentFilter" class="form-select">
-                    <option value="ALL">All Departments</option>
-                    <option th:each="dept : ${departments}" th:value="${dept.departmentId}" th:text="${dept.departmentName}"></option>
-                </select>
-            </div>
-            <div class="col-md-4">
-                <input type="text" id="searchInput" class="form-control" placeholder="Search by name or staff code...">
+            <div class="row mt-3">
+                <div class="col-md-8">
+                    <label class="form-label fw-semibold">Search</label>
+                    <input type="text" id="searchInput" class="form-control" placeholder="Search by name, staff code, or email...">
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <button id="resetFilters" class="btn btn-secondary w-100">
+                        <i class="fas fa-undo-alt"></i> Reset Filters
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -101,38 +175,26 @@
                         <th>Staff Code</th>
                         <th>Name</th>
                         <th>Email</th>
+                        <th>Phone</th>
                         <th>Department</th>
                         <th>Branch</th>
                         <th>Role</th>
+                        <th>Status</th>
                         <th>Actions</th>
                     </tr>
                     </thead>
                     <tbody id="staffTableBody">
-                    <tr th:each="staff : ${staffList}">
-                        <td th:text="${staff.staffCode}">1000001</td>
-                        <td th:text="${staff.firstName + ' ' + staff.otherName}">Staff Name</td>
-                        <td th:text="${staff.email}">email@example.com</td>
-                        <td th:text="${staff.department != null ? staff.department.departmentName : 'N/A'}">Dept</td>
-                        <td th:text="${staff.branch != null ? staff.branch.branchName : 'N/A'}">Branch</td>
-                        <td>
-                            <span class="badge bg-info" th:text="${staff.role}">STAFF</span>
-                        </td>
-                        <td>
-                            <button class="btn btn-sm btn-primary edit-staff-btn"
-                                    th:data-staff-id="${staff.staffId}"
-                                    th:data-staff-code="${staff.staffCode}"
-                                    th:data-staff-name="${staff.firstName + ' ' + staff.otherName}"
-                                    th:data-dept-id="${staff.department != null ? staff.department.departmentId : ''}"
-                                    th:data-branch-id="${staff.branch != null ? staff.branch.branchId : ''}">
-                                <i class="fas fa-edit"></i> Edit
-                            </button>
-                        </td>
-                    </tr>
-                    <tr th:if="${staffList == null || staffList.isEmpty()}">
-                        <td colspan="7" class="text-center">No staff members found</td>
-                    </tr>
+                    <tr><td colspan="9" class="text-center">
+                        <div class="loader"><div class="spinner"></div> Loading staff data...</div>
+                    </td></tr>
                     </tbody>
                 </table>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mt-3">
+                <div id="paginationInfo" class="text-muted"></div>
+                <nav>
+                    <ul class="pagination mb-0" id="pagination"></ul>
+                </nav>
             </div>
         </div>
 
@@ -158,15 +220,38 @@
                     <input type="text" id="editStaffName" class="form-control" readonly>
                 </div>
                 <div class="mb-3">
+                    <label class="fw-bold">Email</label>
+                    <input type="email" id="editEmail" class="form-control">
+                </div>
+                <div class="mb-3">
+                    <label class="fw-bold">Phone Number</label>
+                    <input type="text" id="editPhone" class="form-control">
+                </div>
+                <div class="mb-3">
                     <label class="fw-bold">Department</label>
-                    <select id="editDepartment" class="form-select">
-                        <option th:each="dept : ${departments}" th:value="${dept.departmentId}" th:text="${dept.departmentName}"></option>
+                    <select id="editDepartment" class="form-select select2">
+                        <option value="">Select Department</option>
                     </select>
                 </div>
                 <div class="mb-3">
                     <label class="fw-bold">Branch</label>
-                    <select id="editBranch" class="form-select">
-                        <option th:each="branch : ${branches}" th:value="${branch.branchId}" th:text="${branch.branchName}"></option>
+                    <select id="editBranch" class="form-select select2">
+                        <option value="">Select Branch</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="fw-bold">Role</label>
+                    <select id="editRole" class="form-select select2">
+                        <option value="STAFF">Staff</option>
+                        <option value="SUPERVISOR">Supervisor</option>
+                        <option value="ADMIN">Admin</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="fw-bold">Status</label>
+                    <select id="editStatus" class="form-select select2">
+                        <option value="true">Active</option>
+                        <option value="false">Inactive</option>
                     </select>
                 </div>
             </div>
@@ -186,62 +271,318 @@
 <script>
     $(document).ready(function() {
         let editModal = new bootstrap.Modal(document.getElementById('editStaffModal'));
+        let allStaff = [];
+        let filteredStaff = [];
+        let currentPage = 1;
+        let rowsPerPage = 10;
+        let branchMap = new Map(); // Map branchId -> branchName
+        let deptMap = new Map();   // Map departmentId -> departmentName
 
-        $('#branchFilter, #departmentFilter, #editDepartment, #editBranch').select2({
+        // Initialize Select2
+        $('.select2').select2({
             placeholder: 'Select...',
             allowClear: true,
             width: '100%'
         });
 
-        // Edit Staff
-        $('.edit-staff-btn').click(function() {
-            let staffId = $(this).data('staff-id');
-            let staffCode = $(this).data('staff-code');
-            let staffName = $(this).data('staff-name');
-            let deptId = $(this).data('dept-id');
-            let branchId = $(this).data('branch-id');
+        // Load data on page load
+        loadBranches();
+        loadDepartments();
+        loadStaff();
 
-            $('#editStaffId').val(staffId);
-            $('#editStaffCode').val(staffCode);
-            $('#editStaffName').val(staffName);
-            $('#editDepartment').val(deptId).trigger('change');
-            $('#editBranch').val(branchId).trigger('change');
+        // Load branches for dropdowns
+        function loadBranches() {
+            $.get('/branches')
+                .done(function(data) {
+                    let options = '<option value="">Select Branch</option>';
+                    data.forEach(function(branch) {
+                        options += `<option value="${branch.branchId}">${branch.branchName}</option>`;
+                        branchMap.set(branch.branchId, branch.branchName);
+                    });
+                    $('#editBranch, #branchFilter').html(options);
+                    $('.select2').trigger('change');
+                    console.log('Branches loaded:', data.length);
+                })
+                .fail(function() {
+                    console.error('Failed to load branches');
+                });
+        }
 
-            editModal.show();
-        });
+        // Load departments for dropdowns
+        function loadDepartments() {
+            $.get('/departments')
+                .done(function(data) {
+                    let options = '<option value="">Select Department</option>';
+                    data.forEach(function(dept) {
+                        options += `<option value="${dept.departmentId}">${dept.departmentName}</option>`;
+                        deptMap.set(dept.departmentId, dept.departmentName);
+                    });
+                    $('#editDepartment, #departmentFilter').html(options);
+                    $('.select2').trigger('change');
+                    console.log('Departments loaded:', data.length);
+                })
+                .fail(function() {
+                    console.error('Failed to load departments');
+                });
+        }
 
-        // Save Staff Changes
+        // Load all staff from API
+        function loadStaff() {
+            $.get('/users/fetchAllUsers')
+                .done(function(data) {
+                    console.log('Raw staff data from API:', data.length, 'users');
+
+                    // Log first staff member to debug
+                    if (data.length > 0) {
+                        console.log('First staff member sample:', {
+                            staffCode: data[0].staffCode,
+                            branchId: data[0].branchId,
+                            branchName: data[0].branchName,
+                            departmentId: data[0].departmentId,
+                            departmentName: data[0].departmentName,
+                            role: data[0].role
+                        });
+                    }
+
+                    // Filter out admins and ensure IDs are present
+                    allStaff = data.filter(user => user.role !== 'ADMIN').map(staff => {
+                        // Ensure branchId and departmentId are numbers
+                        if (staff.branchId) staff.branchId = Number(staff.branchId);
+                        if (staff.departmentId) staff.departmentId = Number(staff.departmentId);
+                        return staff;
+                    });
+
+                    console.log('Filtered staff (non-admin):', allStaff.length);
+                    applyFilters();
+                })
+                .fail(function(error) {
+                    console.error('Failed to load staff:', error);
+                    $('#staffTableBody').html('<tr><td colspan="9" class="text-center text-danger">Failed to load staff data</td></tr>');
+                });
+        }
+
+        // Apply filters
+        function applyFilters() {
+            const branchId = $('#branchFilter').val();
+            const departmentId = $('#departmentFilter').val();
+            const role = $('#roleFilter').val();
+            const status = $('#statusFilter').val();
+            const searchTerm = $('#searchInput').val().toLowerCase();
+
+            console.log('Applying filters:', { branchId, departmentId, role, status, searchTerm });
+
+            filteredStaff = allStaff.filter(staff => {
+                let match = true;
+
+                // Branch filter - convert both to numbers for comparison
+                if (branchId && branchId !== '') {
+                    const filterBranchId = Number(branchId);
+                    const staffBranchId = staff.branchId ? Number(staff.branchId) : null;
+                    if (staffBranchId !== filterBranchId) match = false;
+                }
+
+                // Department filter
+                if (departmentId && departmentId !== '' && match) {
+                    const filterDeptId = Number(departmentId);
+                    const staffDeptId = staff.departmentId ? Number(staff.departmentId) : null;
+                    if (staffDeptId !== filterDeptId) match = false;
+                }
+
+                // Role filter
+                if (role && role !== '' && match) {
+                    if (staff.role !== role) match = false;
+                }
+
+                // Status filter
+                if (status && status !== '' && match) {
+                    if (String(staff.active) !== status) match = false;
+                }
+
+                // Search filter
+                if (searchTerm && match) {
+                    const codeMatch = staff.staffCode?.toString().includes(searchTerm);
+                    const nameMatch = `${staff.firstName} ${staff.otherName || ''}`.toLowerCase().includes(searchTerm);
+                    const emailMatch = staff.email?.toLowerCase().includes(searchTerm);
+                    if (!codeMatch && !nameMatch && !emailMatch) match = false;
+                }
+
+                return match;
+            });
+
+            console.log('Filtered staff count:', filteredStaff.length);
+            currentPage = 1;
+            displayStaff();
+        }
+
+        // Display staff with pagination
+        function displayStaff() {
+            const start = (currentPage - 1) * rowsPerPage;
+            const end = start + rowsPerPage;
+            const pageStaff = filteredStaff.slice(start, end);
+            const totalPages = Math.ceil(filteredStaff.length / rowsPerPage);
+
+            // Build table rows
+            let html = '';
+            if (pageStaff.length === 0) {
+                html = '<tr><td colspan="9" class="text-center">No staff members found</td></tr>';
+            } else {
+                pageStaff.forEach(staff => {
+                    const statusBadge = staff.active ?
+                        '<span class="status-badge status-active">Active</span>' :
+                        '<span class="status-badge status-inactive">Inactive</span>';
+
+                    html += `
+                        <tr>
+                            <td>${staff.staffCode}</td>
+                            <td>${staff.firstName} ${staff.otherName || ''}</td>
+                            <td>${staff.email || '-'}</td>
+                            <td>${staff.phoneNumber || '-'}</td>
+                            <td>${staff.departmentName || '-'}</td>
+                            <td>${staff.branchName || '-'}</td>
+                            <td><span class="badge bg-info">${staff.role || 'STAFF'}</span></td>
+                            <td>${statusBadge}</td>
+                            <td>
+                                <button class="btn btn-sm btn-primary edit-staff-btn" data-staff-code="${staff.staffCode}">
+                                    <i class="fas fa-edit"></i> Edit
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            }
+
+            $('#staffTableBody').html(html);
+
+            // Update pagination info
+            if (filteredStaff.length > 0) {
+                $('#paginationInfo').text(`Showing ${start + 1} to ${Math.min(end, filteredStaff.length)} of ${filteredStaff.length} staff`);
+            } else {
+                $('#paginationInfo').text('');
+            }
+
+            // Render pagination
+            renderPagination(totalPages);
+
+            // Attach edit button events
+            $('.edit-staff-btn').click(function() {
+                const staffCode = $(this).data('staff-code');
+                editStaff(staffCode);
+            });
+        }
+
+        // Render pagination
+        function renderPagination(totalPages) {
+            let paginationHtml = '';
+
+            if (totalPages <= 1) {
+                $('#pagination').html('');
+                return;
+            }
+
+            // Previous button
+            if (currentPage > 1) {
+                paginationHtml += `<li class="page-item"><a class="page-link" href="#" data-page="${currentPage - 1}">«</a></li>`;
+            }
+
+            for (let i = 1; i <= totalPages; i++) {
+                paginationHtml += `<li class="page-item ${i === currentPage ? 'active' : ''}">
+                    <a class="page-link" href="#" data-page="${i}">${i}</a>
+                </li>`;
+            }
+
+            // Next button
+            if (currentPage < totalPages) {
+                paginationHtml += `<li class="page-item"><a class="page-link" href="#" data-page="${currentPage + 1}">»</a></li>`;
+            }
+
+            $('#pagination').html(paginationHtml);
+
+            $('.page-link').click(function(e) {
+                e.preventDefault();
+                const page = $(this).data('page');
+                if (page) {
+                    currentPage = page;
+                    displayStaff();
+                }
+            });
+        }
+
+        // Edit staff member
+        function editStaff(staffCode) {
+            $.get(`/users/fetchUser/${staffCode}`)
+                .done(function(staff) {
+                    $('#editStaffId').val(staff.staffId);
+                    $('#editStaffCode').val(staff.staffCode);
+                    $('#editStaffName').val(`${staff.firstName} ${staff.otherName || ''}`);
+                    $('#editEmail').val(staff.email || '');
+                    $('#editPhone').val(staff.phoneNumber || '');
+                    $('#editDepartment').val(staff.departmentId).trigger('change');
+                    $('#editBranch').val(staff.branchId).trigger('change');
+                    $('#editRole').val(staff.role).trigger('change');
+                    $('#editStatus').val(String(staff.active)).trigger('change');
+
+                    editModal.show();
+                })
+                .fail(function() {
+                    Swal.fire('Error!', 'Failed to load staff details', 'error');
+                });
+        }
+
+        // Save staff changes
         $('#saveStaffBtn').click(function() {
-            let staffId = $('#editStaffId').val();
-            let deptId = $('#editDepartment').val();
-            let branchId = $('#editBranch').val();
+            const staffCode = $('#editStaffCode').val();
+            const nameParts = $('#editStaffName').val().trim().split(' ');
+            const firstName = nameParts[0] || '';
+            const otherName = nameParts.slice(1).join(' ');
+
+            const data = {
+                firstName: firstName,
+                otherName: otherName,
+                email: $('#editEmail').val(),
+                phoneNumber: $('#editPhone').val(),
+                departmentId: $('#editDepartment').val() || null,
+                branchId: $('#editBranch').val() || null,
+                role: $('#editRole').val(),
+                active: $('#editStatus').val() === 'true'
+            };
+
+            console.log('Saving staff data:', data);
 
             $.ajax({
-                url: `/admin/staff/${staffId}/update`,
-                type: 'POST',
-                data: { branchId: branchId, departmentId: deptId },
+                url: `/users/updateUser/${staffCode}`,
+                type: 'PUT',
+                contentType: 'application/json',
+                data: JSON.stringify(data),
                 success: function(response) {
-                    if (response.status === 'success') {
-                        Swal.fire('Updated!', response.message, 'success');
-                        editModal.hide();
-                        setTimeout(() => location.reload(), 1500);
-                    } else {
-                        Swal.fire('Error!', response.message, 'error');
-                    }
+                    Swal.fire('Success!', 'Staff updated successfully', 'success');
+                    editModal.hide();
+                    loadStaff();
                 },
-                error: function() {
-                    Swal.fire('Error!', 'Failed to update staff', 'error');
+                error: function(xhr) {
+                    const message = xhr.responseJSON?.message || 'Failed to update staff';
+                    Swal.fire('Error!', message, 'error');
                 }
             });
         });
 
-        // Search
+        // Filter event listeners
+        $('#branchFilter, #departmentFilter, #roleFilter, #statusFilter').on('change', function() {
+            console.log('Filter changed:', this.id, $(this).val());
+            applyFilters();
+        });
+
         $('#searchInput').on('keyup', function() {
-            let searchTerm = $(this).val().toLowerCase();
-            $('#staffTableBody tr').each(function() {
-                let text = $(this).text().toLowerCase();
-                $(this).toggle(text.includes(searchTerm));
-            });
+            clearTimeout(window.searchTimeout);
+            window.searchTimeout = setTimeout(applyFilters, 300);
+        });
+
+        $('#resetFilters').click(function() {
+            $('#branchFilter').val('').trigger('change');
+            $('#departmentFilter').val('').trigger('change');
+            $('#roleFilter').val('').trigger('change');
+            $('#statusFilter').val('').trigger('change');
+            $('#searchInput').val('');
+            applyFilters();
         });
     });
 </script>

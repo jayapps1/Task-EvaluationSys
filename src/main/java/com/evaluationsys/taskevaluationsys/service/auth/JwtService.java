@@ -4,23 +4,28 @@ import com.evaluationsys.taskevaluationsys.entity.User;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import jakarta.annotation.PostConstruct;
 import java.security.Key;
 import java.util.Date;
 
 @Service
 public class JwtService {
 
+    @Value("${jwt.secret}")
+    private String secretKey;
 
-    private static final String SECRET_KEY = "mysecretkey1234567890123456789012";
-    private static final long EXPIRATION_MS = 1000 * 60 * 60 * 24; // 24 hours
+    @Value("${jwt.expiration}")
+    private long expirationMs;
 
-    private final Key key;
+    private Key key;
 
-    public JwtService() {
-        // Convert the string secret to a Key object
-        this.key = Keys.hmacShaKeyFor(SECRET_KEY.getBytes());
+    // Initialize signing key after Spring injects values
+    @PostConstruct
+    public void init() {
+        this.key = Keys.hmacShaKeyFor(secretKey.getBytes());
     }
 
     public String generateToken(User user) {
@@ -28,7 +33,7 @@ public class JwtService {
                 .setSubject(user.getStaffCode().toString())
                 .claim("role", user.getRole().name())
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION_MS))
+                .setExpiration(new Date(System.currentTimeMillis() + expirationMs))
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
     }

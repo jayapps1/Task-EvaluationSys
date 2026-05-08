@@ -5,6 +5,7 @@ import com.evaluationsys.taskevaluationsys.dtoresponse.TaskDTOResponse;
 import com.evaluationsys.taskevaluationsys.entity.Task;
 import com.evaluationsys.taskevaluationsys.entity.TaskAssignment;
 import com.evaluationsys.taskevaluationsys.entity.User;
+import com.evaluationsys.taskevaluationsys.entity.Supervisor;
 import com.evaluationsys.taskevaluationsys.entity.enums.TaskStatus;
 import com.evaluationsys.taskevaluationsys.repository.TaskAssignmentRepository;
 import com.evaluationsys.taskevaluationsys.repository.TaskRepository;
@@ -35,10 +36,10 @@ public class StaffTaskService {
     private TaskService taskService;
 
     @Autowired
-    private TaskAssignmentService taskAssignmentService;  // ✅ ADDED
+    private TaskAssignmentService taskAssignmentService;
 
     // =========================
-    // ✅ GET STAFF ASSIGNMENTS (Returns TaskAssignmentDTOResponse)
+    // ✅ GET STAFF ASSIGNMENTS
     // =========================
     public List<TaskAssignmentDTOResponse> getStaffAssignments(Long staffId) {
         List<TaskAssignment> assignments = assignmentRepository.findByAssignUser_StaffId(staffId);
@@ -53,11 +54,72 @@ public class StaffTaskService {
     }
 
     // =========================
+    // GET SUPERVISOR FROM STAFF'S TASKS (Groups by user to avoid duplicates)
+    // =========================
+    public Map<String, String> getSupervisorFromStaffTasks(Long staffId) {
+        Map<String, String> supervisorInfo = new HashMap<>();
+
+        // Get all task assignments for this staff
+        List<TaskAssignment> assignments = assignmentRepository.findByAssignUser_StaffId(staffId);
+
+        if (assignments.isEmpty()) {
+            supervisorInfo.put("name", "No Tasks Assigned");
+            supervisorInfo.put("phone", "N/A");
+            supervisorInfo.put("email", "N/A");
+            return supervisorInfo;
+        }
+
+        // Find unique supervisors by USER (staff_id), not by supervisor record ID
+        Map<Long, Supervisor> uniqueSupervisorsByUser = new HashMap<>();
+
+        for (TaskAssignment assignment : assignments) {
+            if (assignment.getTask() != null && assignment.getTask().getSupervisor() != null) {
+                Supervisor supervisor = assignment.getTask().getSupervisor();
+                if (supervisor.getUser() != null) {
+                    Long userStaffId = supervisor.getUser().getStaffId();
+                    if (!uniqueSupervisorsByUser.containsKey(userStaffId)) {
+                        uniqueSupervisorsByUser.put(userStaffId, supervisor);
+                    }
+                }
+            }
+        }
+
+        if (uniqueSupervisorsByUser.isEmpty()) {
+            supervisorInfo.put("name", "No Supervisor Assigned to Tasks");
+            supervisorInfo.put("phone", "N/A");
+            supervisorInfo.put("email", "N/A");
+            return supervisorInfo;
+        }
+
+        Supervisor supervisor = uniqueSupervisorsByUser.values().iterator().next();
+
+        if (supervisor.getUser() != null) {
+            User supUser = supervisor.getUser();
+            String supervisorName = (supUser.getFirstName() != null ? supUser.getFirstName() : "") +
+                    " " +
+                    (supUser.getOtherName() != null ? supUser.getOtherName() : "");
+
+            supervisorInfo.put("name", supervisorName.trim().isEmpty() ? "Supervisor" : supervisorName.trim());
+            supervisorInfo.put("phone", supUser.getPhoneNumber() != null ? supUser.getPhoneNumber() : "N/A");
+            supervisorInfo.put("email", supUser.getEmail() != null ? supUser.getEmail() : "N/A");
+
+            System.out.println("Supervisor found: " + supervisorName);
+            System.out.println("Supervisor phone: " + supUser.getPhoneNumber());
+            System.out.println("Total unique supervisor users: " + uniqueSupervisorsByUser.size());
+        } else {
+            supervisorInfo.put("name", "Supervisor Found (No User Data)");
+            supervisorInfo.put("phone", "N/A");
+            supervisorInfo.put("email", "N/A");
+        }
+
+        return supervisorInfo;
+    }
+
+    // =========================
     // ✅ GET ACTIVE ASSIGNMENTS (Excluding APPROVED, REJECTED)
     // =========================
     public List<TaskAssignmentDTOResponse> getActiveAssignments(Long staffId) {
         List<TaskAssignment> assignments = assignmentRepository.findActiveAssignmentsByStaffId(staffId);
-
         return assignments.stream()
                 .map(this::convertToAssignmentResponse)
                 .filter(Objects::nonNull)
@@ -69,7 +131,6 @@ public class StaffTaskService {
     // =========================
     public List<TaskAssignmentDTOResponse> getAssignmentsByStatus(Long staffId, TaskStatus status) {
         List<TaskAssignment> assignments = assignmentRepository.findByStaffIdAndStatus(staffId, status);
-
         return assignments.stream()
                 .map(this::convertToAssignmentResponse)
                 .filter(Objects::nonNull)
@@ -98,15 +159,33 @@ public class StaffTaskService {
     @Transactional
     public boolean acceptAssignment(Long taskId, Long staffId) {
         try {
-            if (!isAssignmentAssignedToStaff(taskId, staffId)) {
+            // Use the repository method findByTaskIdAndStaffId
+            Optional<TaskAssignment> assignmentOpt =
+                    assignmentRepository.findByTaskIdAndStaffId(taskId, staffId);
+
+            if (assignmentOpt.isEmpty()) {
                 System.out.println("Assignment not found for taskId: " + taskId + " and staffId: " + staffId);
                 return false;
             }
 
-            Optional<TaskAssignmentDTOResponse> result =
-                    taskAssignmentService.updateMyAssignmentStatus(taskId, staffId, TaskStatus.INITIATED);
+            TaskAssignment assignment = assignmentOpt.get();
 
-            return result.isPresent();
+            // Validate current status
+            if (assignment.getStatus() != TaskStatus.ASSIGNED) {
+                System.out.println("Cannot accept assignment. Current status: " + assignment.getStatus());
+                return false;
+            }
+
+            // Update status using direct update method
+            int updated = assignmentRepository.updateStatusByTaskIdAndStaffId(taskId, staffId, TaskStatus.INITIATED);
+
+            if (updated > 0) {
+                System.out.println("✅ Assignment accepted for taskId: " + taskId);
+                return true;
+            }
+
+            return false;
+
         } catch (Exception e) {
             System.err.println("Error accepting assignment: " + e.getMessage());
             e.printStackTrace();
@@ -120,15 +199,30 @@ public class StaffTaskService {
     @Transactional
     public boolean startAssignment(Long taskId, Long staffId) {
         try {
-            if (!isAssignmentAssignedToStaff(taskId, staffId)) {
+            Optional<TaskAssignment> assignmentOpt =
+                    assignmentRepository.findByTaskIdAndStaffId(taskId, staffId);
+
+            if (assignmentOpt.isEmpty()) {
                 System.out.println("Assignment not found for taskId: " + taskId + " and staffId: " + staffId);
                 return false;
             }
 
-            Optional<TaskAssignmentDTOResponse> result =
-                    taskAssignmentService.updateMyAssignmentStatus(taskId, staffId, TaskStatus.IN_PROGRESS);
+            TaskAssignment assignment = assignmentOpt.get();
 
-            return result.isPresent();
+            if (assignment.getStatus() != TaskStatus.INITIATED) {
+                System.out.println("Cannot start assignment. Current status: " + assignment.getStatus());
+                return false;
+            }
+
+            int updated = assignmentRepository.updateStatusByTaskIdAndStaffId(taskId, staffId, TaskStatus.IN_PROGRESS);
+
+            if (updated > 0) {
+                System.out.println("✅ Assignment started for taskId: " + taskId);
+                return true;
+            }
+
+            return false;
+
         } catch (Exception e) {
             System.err.println("Error starting assignment: " + e.getMessage());
             e.printStackTrace();
@@ -137,27 +231,41 @@ public class StaffTaskService {
     }
 
     // =========================
-    // ✅ COMPLETE ASSIGNMENT (IN_PROGRESS → COMPLETED)
+    // ✅ COMPLETE ASSIGNMENT (IN_PROGRESS → COMPLETED → PENDING_REVIEW)
     // =========================
     @Transactional
     public boolean completeAssignment(Long taskId, Long staffId) {
         try {
-            if (!isAssignmentAssignedToStaff(taskId, staffId)) {
+            Optional<TaskAssignment> assignmentOpt =
+                    assignmentRepository.findByTaskIdAndStaffId(taskId, staffId);
+
+            if (assignmentOpt.isEmpty()) {
                 System.out.println("Assignment not found for taskId: " + taskId + " and staffId: " + staffId);
                 return false;
             }
 
-            // First update to COMPLETED
-            Optional<TaskAssignmentDTOResponse> result =
-                    taskAssignmentService.updateMyAssignmentStatus(taskId, staffId, TaskStatus.COMPLETED);
+            TaskAssignment assignment = assignmentOpt.get();
 
-            if (result.isPresent()) {
+            if (assignment.getStatus() != TaskStatus.IN_PROGRESS) {
+                System.out.println("Cannot complete assignment. Current status: " + assignment.getStatus());
+                return false;
+            }
+
+            // Update to COMPLETED first
+            int updated1 = assignmentRepository.updateStatusByTaskIdAndStaffId(taskId, staffId, TaskStatus.COMPLETED);
+
+            if (updated1 > 0) {
                 // Then update to PENDING_REVIEW (submits for supervisor approval)
-                taskAssignmentService.updateMyAssignmentStatus(taskId, staffId, TaskStatus.PENDING_REVIEW);
-                return true;
+                int updated2 = assignmentRepository.updateStatusByTaskIdAndStaffId(taskId, staffId, TaskStatus.PENDING_REVIEW);
+
+                if (updated2 > 0) {
+                    System.out.println("✅ Assignment completed and submitted for review for taskId: " + taskId);
+                    return true;
+                }
             }
 
             return false;
+
         } catch (Exception e) {
             System.err.println("Error completing assignment: " + e.getMessage());
             e.printStackTrace();
@@ -175,36 +283,34 @@ public class StaffTaskService {
     // =========================
     // ✅ STATISTICS FOR ASSIGNMENTS
     // =========================
-
     public StaffTaskStatistics getAssignmentStatistics(Long staffId) {
         List<TaskAssignment> assignments = assignmentRepository.findByAssignUser_StaffId(staffId);
 
         StaffTaskStatistics stats = new StaffTaskStatistics();
         stats.setTotalTasks(assignments.size());
 
-        // ✅ Pending Tasks = ASSIGNED + INITIATED (according to your definition)
+        // Pending Tasks = ASSIGNED + INITIATED
         stats.setPendingTasks((int) assignments.stream()
                 .filter(a -> a.getStatus() == TaskStatus.ASSIGNED ||
                         a.getStatus() == TaskStatus.INITIATED)
                 .count());
 
-        // ✅ In Progress = IN_PROGRESS
+        // In Progress = IN_PROGRESS
         stats.setInProgressTasks((int) assignments.stream()
                 .filter(a -> a.getStatus() == TaskStatus.IN_PROGRESS)
                 .count());
 
-        // ✅ Pending Review = PENDING_REVIEW (waiting for supervisor)
+        // Pending Review = PENDING_REVIEW (waiting for supervisor)
         stats.setPendingReviewTasks((int) assignments.stream()
                 .filter(a -> a.getStatus() == TaskStatus.PENDING_REVIEW)
                 .count());
 
-        // ✅ Completed = APPROVED + COMPLETED
+        // Completed = APPROVED
         stats.setCompletedTasks((int) assignments.stream()
-                .filter(a -> a.getStatus() == TaskStatus.APPROVED ||
-                        a.getStatus() == TaskStatus.COMPLETED)
+                .filter(a -> a.getStatus() == TaskStatus.APPROVED)
                 .count());
 
-        // ✅ Completion Rate
+        // Completion Rate
         if (stats.getTotalTasks() > 0) {
             stats.setCompletionRate((stats.getCompletedTasks() * 100.0) / stats.getTotalTasks());
         }
@@ -359,7 +465,7 @@ public class StaffTaskService {
 
         TaskDTOResponse response = new TaskDTOResponse();
         response.setTaskId(assignment.getTaskId());
-        response.setTaskCode(assignment.getTaskAssignCode()); // Note: using assign code as task code for display
+        response.setTaskCode(assignment.getTaskAssignCode());
         response.setDescription(assignment.getTaskDescription());
         response.setTaskStatus(TaskStatus.valueOf(assignment.getStatus()));
         response.setDeadline(assignment.getTaskDeadline());

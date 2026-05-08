@@ -41,25 +41,22 @@ public class StaffEvaluationService {
     @Autowired
     private SupervisorRepository supervisorRepository;
 
-    /**
-     * Get all staff members with their evaluation summary
-     */
+    // =========================
+    // SUMMARY METHODS
+    // =========================
+
     public List<Map<String, Object>> getAllStaffEvaluationSummary() {
         List<User> staffMembers = userRepository.findByRole(Role.STAFF);
+        log.info("Total staff members: {}", staffMembers.size());
         return staffMembers.stream()
                 .map(this::getStaffEvaluationSummary)
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Get filtered staff evaluation summary
-     */
     public List<Map<String, Object>> getFilteredStaffEvaluationSummary(Long branchId, Long departmentId) {
         List<User> staffMembers;
-
         if (branchId != null && departmentId != null) {
-            staffMembers = userRepository.findByRoleAndBranchIdAndDepartmentId(
-                    Role.STAFF, branchId, departmentId);
+            staffMembers = userRepository.findByRoleAndBranchIdAndDepartmentId(Role.STAFF, branchId, departmentId);
         } else if (branchId != null) {
             staffMembers = userRepository.findByRoleAndBranchId(Role.STAFF, branchId);
         } else if (departmentId != null) {
@@ -67,14 +64,15 @@ public class StaffEvaluationService {
         } else {
             staffMembers = userRepository.findByRole(Role.STAFF);
         }
-
+        log.info("Filtered staff members: {}", staffMembers.size());
         return staffMembers.stream()
                 .map(this::getStaffEvaluationSummary)
                 .collect(Collectors.toList());
     }
 
     /**
-     * Get evaluation summary for a single staff member - COMPLETELY ISOLATED
+     * Evaluation summary for a single staff member – COMPLETELY ISOLATED using staff_id.
+     * This ensures evaluations from one staff never affect another staff's data.
      */
     public Map<String, Object> getStaffEvaluationSummary(User staff) {
         Map<String, Object> summary = new HashMap<>();
@@ -90,7 +88,6 @@ public class StaffEvaluationService {
         } else {
             summary.put("branchName", "Not Assigned");
         }
-
         if (staff.getDepartment() != null) {
             summary.put("departmentId", staff.getDepartment().getDepartmentId());
             summary.put("departmentName", staff.getDepartment().getDepartmentName());
@@ -98,63 +95,42 @@ public class StaffEvaluationService {
             summary.put("departmentName", "Not Assigned");
         }
 
-        // Get ALL task assignments for this specific staff ONLY
-        List<TaskAssignment> assignments = taskAssignmentRepository.findByAssignUser_StaffId(staff.getStaffId());
-
-        // Double verify each assignment belongs to this staff
-        assignments = assignments.stream()
-                .filter(a -> a.getAssignUser().getStaffId().equals(staff.getStaffId()))
+        // All task assignments for this specific staff
+        List<TaskAssignment> assignments = taskAssignmentRepository.findByAssignUser_StaffId(staff.getStaffId())
+                .stream()
+                .filter(a -> a.getAssignUser() != null && a.getAssignUser().getStaffId().equals(staff.getStaffId()))
                 .collect(Collectors.toList());
 
         int totalTasks = assignments.size();
-        int completedTasks = 0;
-        int pendingTasks = 0;
-        int inProgressTasks = 0;
-        int rejectedTasks = 0;
-        int approvedTasks = 0;
+        int completedTasks = 0, pendingTasks = 0, inProgressTasks = 0, rejectedTasks = 0, approvedTasks = 0;
 
-        for (TaskAssignment assignment : assignments) {
-            if (assignment.getStatus() == TaskStatus.APPROVED) {
+        for (TaskAssignment a : assignments) {
+            if (a.getStatus() == TaskStatus.APPROVED) {
                 approvedTasks++;
                 completedTasks++;
-            } else if (assignment.getStatus() == TaskStatus.COMPLETED) {
+            } else if (a.getStatus() == TaskStatus.COMPLETED) {
                 completedTasks++;
-            } else if (assignment.getStatus() == TaskStatus.REJECTED) {
+            } else if (a.getStatus() == TaskStatus.REJECTED) {
                 rejectedTasks++;
-            } else if (assignment.getStatus() == TaskStatus.IN_PROGRESS) {
+            } else if (a.getStatus() == TaskStatus.IN_PROGRESS) {
                 inProgressTasks++;
             } else {
                 pendingTasks++;
             }
         }
 
-        // Get evaluations ONLY for this staff's tasks
-        List<Evaluation> evaluations = new ArrayList<>();
-        for (TaskAssignment assignment : assignments) {
-            // Get evaluations for this specific task
-            List<Evaluation> evalList = evaluationRepository.findByTask_TaskId(assignment.getTask().getTaskId());
-            // Filter evaluations that belong to this staff's task (should already be correct, but double filter)
-            for (Evaluation eval : evalList) {
-                // Verify this evaluation is actually for this staff member through task assignment
-                Optional<TaskAssignment> verifyAssignment = taskAssignmentRepository
-                        .findByStaffIdAndTask_TaskId(staff.getStaffId(), eval.getTask().getTaskId());
-                if (verifyAssignment.isPresent()) {
-                    evaluations.add(eval);
-                }
-            }
-        }
+        // ✅ FIXED: Get evaluations DIRECTLY by staff_id - COMPLETE ISOLATION
+        // This ensures you ONLY get evaluations belonging to THIS specific staff member
+        List<Evaluation> evaluations = evaluationRepository.findByStaffId(staff.getStaffId());
 
+        // Average score – skip null scores
         double averageScore = evaluations.stream()
+                .filter(e -> e.getScore() != null)
                 .mapToDouble(Evaluation::getScore)
                 .average()
                 .orElse(0.0);
 
-        int totalEvaluations = evaluations.size();
-
-        // Calculate completion rate
         double completionRate = totalTasks > 0 ? (completedTasks * 100.0 / totalTasks) : 0.0;
-
-        // Determine performance level
         String performanceLevel = determinePerformanceLevel(averageScore);
 
         summary.put("totalTasks", totalTasks);
@@ -165,346 +141,308 @@ public class StaffEvaluationService {
         summary.put("approvedTasks", approvedTasks);
         summary.put("completionRate", Math.round(completionRate * 100.0) / 100.0);
         summary.put("averageScore", Math.round(averageScore * 100.0) / 100.0);
-        summary.put("totalEvaluations", totalEvaluations);
+        summary.put("totalEvaluations", evaluations.size());
         summary.put("performanceLevel", performanceLevel);
 
-        // Get recent evaluations
+        // Recent evaluations (max 5) - now using staff_id filtered list
         List<Map<String, Object>> recentEvals = evaluations.stream()
-                .sorted((e1, e2) -> e2.getEvaluationDate().compareTo(e1.getEvaluationDate()))
+                .sorted(Comparator.comparing(Evaluation::getEvaluationDate, Comparator.nullsLast(Comparator.reverseOrder())))
                 .limit(5)
                 .map(e -> {
-                    Map<String, Object> evalMap = new HashMap<>();
-                    evalMap.put("evaluationId", e.getEvaluationId());
-                    evalMap.put("evaluationCode", e.getEvaluationCode());
-                    evalMap.put("score", e.getScore());
-                    evalMap.put("remarks", e.getRemarks());
-                    evalMap.put("evaluationDate", e.getEvaluationDate());
-                    evalMap.put("quarter", e.getQuarter());
-                    evalMap.put("year", e.getYear());
-                    // Get task info for display
-                    Optional<TaskAssignment> taskAssign = taskAssignmentRepository
-                            .findByStaffIdAndTask_TaskId(staff.getStaffId(), e.getTask().getTaskId());
-                    evalMap.put("taskCode", taskAssign.map(ta -> ta.getTask().getTaskCode()).orElse("N/A"));
-                    return evalMap;
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("evaluationId", e.getEvaluationId());
+                    map.put("evaluationCode", e.getEvaluationCode());
+                    map.put("score", e.getScore());
+                    map.put("remarks", e.getRemarks());
+                    map.put("evaluationDate", e.getEvaluationDate());
+                    map.put("quarter", e.getQuarter());
+                    map.put("year", e.getYear());
+                    map.put("taskCode", e.getTask() != null ? e.getTask().getTaskCode() : null);
+                    map.put("taskId", e.getTask() != null ? e.getTask().getTaskId() : null);
+                    return map;
                 })
                 .collect(Collectors.toList());
-
         summary.put("recentEvaluations", recentEvals);
 
-        log.info("Staff {}: totalTasks={}, completedTasks={}, averageScore={}, evaluations={}",
-                staff.getFirstName(), totalTasks, completedTasks, averageScore, evaluations.size());
-
+        log.info("Staff {} (ID: {}): totalTasks={}, completed={}, avgScore={}, evaluations={}",
+                staff.getFirstName(), staff.getStaffId(), totalTasks, completedTasks, averageScore, evaluations.size());
         return summary;
     }
 
-    /**
-     * Get detailed evaluation for a specific staff member
-     */
+    // =========================
+    // DETAILED VIEW
+    // =========================
+
     public Map<String, Object> getStaffEvaluationDetails(Long staffId) {
         User staff = userRepository.findByStaffId(staffId)
                 .orElseThrow(() -> new RuntimeException("Staff not found with ID: " + staffId));
-
-        if (staff.getRole() != Role.STAFF) {
-            throw new RuntimeException("User is not a staff member");
-        }
+        if (staff.getRole() != Role.STAFF) throw new RuntimeException("User is not a staff member");
 
         Map<String, Object> details = getStaffEvaluationSummary(staff);
-
-        // Get all task assignments with their evaluations - ONLY for this staff
-        List<TaskAssignment> assignments = taskAssignmentRepository.findByAssignUser_StaffId(staffId);
-
-        List<Map<String, Object>> taskDetails = assignments.stream()
-                .filter(assignment -> assignment.getAssignUser().getStaffId().equals(staffId))
-                .map(assignment -> {
-                    Map<String, Object> taskMap = new HashMap<>();
-                    Task task = assignment.getTask();
-
-                    taskMap.put("assignmentId", assignment.getId());
-                    taskMap.put("taskId", task.getTaskId());
-                    taskMap.put("taskTitle", task.getDescription() != null ? task.getDescription() : "Task #" + task.getTaskId());
-                    taskMap.put("taskDescription", task.getDescription() != null ? task.getDescription() : "");
-                    taskMap.put("taskCode", task.getTaskCode());
-                    taskMap.put("status", assignment.getStatus().toString());
-                    taskMap.put("assignedDate", assignment.getAssignedAt());
-                    taskMap.put("dueDate", task.getDeadline());
-
-                    // Get evaluation for this task - verify it's for this staff
-                    List<Evaluation> evaluations = evaluationRepository.findByTask_TaskId(task.getTaskId());
-                    Optional<Evaluation> staffEval = evaluations.stream()
-                            .filter(e -> {
-                                Optional<TaskAssignment> ta = taskAssignmentRepository
-                                        .findByStaffIdAndTask_TaskId(staffId, e.getTask().getTaskId());
-                                return ta.isPresent();
-                            })
-                            .findFirst();
-
-                    if (staffEval.isPresent()) {
-                        Evaluation eval = staffEval.get();
-                        taskMap.put("evaluationId", eval.getEvaluationId());
-                        taskMap.put("evaluationCode", eval.getEvaluationCode());
-                        taskMap.put("score", eval.getScore());
-                        taskMap.put("remarks", eval.getRemarks());
-                        taskMap.put("evaluationDate", eval.getEvaluationDate());
-                    } else {
-                        taskMap.put("evaluationId", null);
-                        taskMap.put("evaluationCode", null);
-                        taskMap.put("score", null);
-                        taskMap.put("remarks", null);
-                        taskMap.put("evaluationDate", null);
-                    }
-
-                    return taskMap;
-                })
+        List<TaskAssignment> assignments = taskAssignmentRepository.findByAssignUser_StaffId(staffId)
+                .stream()
+                .filter(a -> a.getAssignUser().getStaffId().equals(staffId))
                 .collect(Collectors.toList());
 
-        details.put("taskDetails", taskDetails);
+        List<Map<String, Object>> taskDetails = assignments.stream()
+                .map(a -> {
+                    Map<String, Object> tm = new HashMap<>();
+                    Task t = a.getTask();
+                    tm.put("assignmentId", a.getId());
+                    tm.put("taskId", t.getTaskId());
+                    tm.put("taskTitle", t.getDescription() != null ? t.getDescription() : "Task #" + t.getTaskId());
+                    tm.put("taskDescription", t.getDescription());
+                    tm.put("taskCode", t.getTaskCode());
+                    tm.put("status", a.getStatus().toString());
+                    tm.put("assignedDate", a.getAssignedAt());
+                    tm.put("dueDate", t.getDeadline());
 
+                    // ✅ FIXED: Use the repository method to get evaluation by staff_id AND task_id
+                    Optional<Evaluation> evaluationOpt = evaluationRepository.findByStaffIdAndTask_TaskId(staffId, t.getTaskId());
+                    evaluationOpt.ifPresent(e -> {
+                        tm.put("evaluationId", e.getEvaluationId());
+                        tm.put("evaluationCode", e.getEvaluationCode());
+                        tm.put("score", e.getScore());
+                        tm.put("remarks", e.getRemarks());
+                        tm.put("evaluationDate", e.getEvaluationDate());
+                        tm.put("quarter", e.getQuarter());
+                        tm.put("year", e.getYear());
+                    });
+                    return tm;
+                })
+                .collect(Collectors.toList());
+        details.put("taskDetails", taskDetails);
         return details;
     }
 
-    /**
-     * Create evaluation for a staff member - With strict staff isolation
-     */
+    // =========================
+    // CREATE EVALUATION – STRICT STAFF ISOLATION
+    // =========================
+
     @Transactional
     public EvaluationDTOResponse createStaffEvaluation(Long staffId, Long taskId, Double score, String remarks, Integer quarter, Integer year) {
-
-        // Verify staff exists
         User staff = userRepository.findByStaffId(staffId)
                 .orElseThrow(() -> new RuntimeException("Staff not found with ID: " + staffId));
+        if (staff.getRole() != Role.STAFF) throw new RuntimeException("User is not a staff member");
 
-        if (staff.getRole() != Role.STAFF) {
-            throw new RuntimeException("User is not a staff member");
-        }
+        // 1. Task must be assigned to this staff
+        TaskAssignment assignment = taskAssignmentRepository.findByStaffIdAndTask_TaskId(staffId, taskId)
+                .orElseThrow(() -> new RuntimeException("Task " + taskId + " is not assigned to staff " + staffId));
 
-        // Verify task assignment exists for this specific staff
-        Optional<TaskAssignment> assignmentOpt = taskAssignmentRepository.findByStaffIdAndTask_TaskId(staffId, taskId);
-        TaskAssignment assignment = assignmentOpt
-                .orElseThrow(() -> new RuntimeException("Task not assigned to this staff"));
-
-        // Strict verification: ensure this task belongs ONLY to this staff member
+        // 2. Extra safety: check assignee
         if (!assignment.getAssignUser().getStaffId().equals(staffId)) {
-            throw new RuntimeException("Task does not belong to this staff member");
+            throw new RuntimeException("Task does not belong to this staff member (staffId=" + staffId + ")");
         }
 
-        // Check if evaluation already exists for this task in the same quarter
+        // 3. No duplicate evaluation for same staff, task, quarter, year
         Integer evalYear = year != null ? year : Year.now().getValue();
         Integer evalQuarter = quarter != null ? quarter : getCurrentQuarter();
 
-        List<Evaluation> existingEvals = evaluationRepository.findByTask_TaskId(taskId);
-        for (Evaluation existing : existingEvals) {
-            // Verify this existing evaluation is for this staff member
-            Optional<TaskAssignment> existingAssignment = taskAssignmentRepository
-                    .findByStaffIdAndTask_TaskId(staffId, existing.getTask().getTaskId());
-            if (existingAssignment.isPresent() &&
-                    existing.getYear().equals(evalYear) &&
-                    existing.getQuarter().equals(evalQuarter)) {
-                throw new RuntimeException("Evaluation already exists for this task in Q" + evalQuarter + " " + evalYear);
-            }
+        // ✅ Use the repository method for duplicate check
+        boolean alreadyExists = evaluationRepository.existsByStaffIdAndTaskIdAndYearAndQuarter(
+                staffId, taskId, evalYear, evalQuarter);
+
+        if (alreadyExists) {
+            throw new RuntimeException("Evaluation already exists for this staff on task " + taskId +
+                    " in Q" + evalQuarter + " " + evalYear);
         }
 
-        // Get supervisor from task
         Supervisor supervisor = assignment.getTask().getSupervisor();
-        if (supervisor == null) {
-            throw new RuntimeException("No supervisor assigned to this task");
-        }
+        if (supervisor == null) throw new RuntimeException("No supervisor assigned to this task");
 
-        // Create evaluation DTO
-        EvaluationDTO evaluationDTO = new EvaluationDTO();
-        evaluationDTO.setTask_id(taskId);
-        evaluationDTO.setSupervisorId(supervisor.getSupervisorId());
-        if (score != null) {
-            evaluationDTO.setScore(score);
-        }
-        evaluationDTO.setRemarks(remarks);
-        evaluationDTO.setEvaluationDate(LocalDateTime.now());
-        evaluationDTO.setYear(evalYear);
-        evaluationDTO.setQuarter(evalQuarter);
+        EvaluationDTO dto = new EvaluationDTO();
+        dto.setTask_id(taskId);
+        dto.setStaffId(staffId);  // ✅ CRITICAL: Set staff_id for isolation
+        dto.setSupervisorId(supervisor.getSupervisorId());
+        if (score != null) dto.setScore(score);
+        dto.setRemarks(remarks);
+        dto.setEvaluationDate(LocalDateTime.now());
+        dto.setYear(evalYear);
+        dto.setQuarter(evalQuarter);
 
-        log.info("Creating evaluation for staff {} (ID: {}) for task {} in Q{}/{} - This evaluation belongs ONLY to this staff",
+        log.info("Creating evaluation for staff {} (ID {}) on task {} in Q{}/{}",
                 staff.getFirstName(), staffId, taskId, evalQuarter, evalYear);
-
-        // Save evaluation
-        return evaluationService.createEvaluation(evaluationDTO);
+        return evaluationService.createEvaluation(dto);
     }
 
-    /**
-     * Update existing evaluation - with staff verification (FIXED)
-     */
+    // =========================
+    // UPDATE EVALUATION
+    // =========================
+
     @Transactional
     public Optional<EvaluationDTOResponse> updateStaffEvaluation(Long evaluationId, Double score, String remarks) {
         return evaluationRepository.findById(evaluationId).map(evaluation -> {
-            // Verify this evaluation belongs to the correct staff via task assignment
-            // findByTask_TaskId returns List, not Optional
-            List<TaskAssignment> assignments = taskAssignmentRepository.findByTask_TaskId(evaluation.getTask().getTaskId());
-            if (assignments.isEmpty()) {
-                throw new RuntimeException("Associated task assignment not found");
+            // Verify this evaluation belongs to the correct staff (security check)
+            if (evaluation.getStaffId() == null) {
+                throw new RuntimeException("Evaluation has no staff association");
             }
 
-            EvaluationDTO updateDTO = new EvaluationDTO();
-            updateDTO.setTask_id(evaluation.getTask().getTaskId());
-            updateDTO.setSupervisorId(evaluation.getSupervisor().getSupervisorId());
-            updateDTO.setScore(score);
-            updateDTO.setRemarks(remarks);
-            updateDTO.setEvaluationDate(LocalDateTime.now());
-            updateDTO.setYear(evaluation.getYear());
-            updateDTO.setQuarter(evaluation.getQuarter());
+            EvaluationDTO dto = new EvaluationDTO();
+            dto.setTask_id(evaluation.getTask().getTaskId());
+            dto.setStaffId(evaluation.getStaffId());  // ✅ Preserve staff ID
+            dto.setSupervisorId(evaluation.getSupervisor().getSupervisorId());
+            dto.setScore(score);
+            dto.setRemarks(remarks);
+            dto.setEvaluationDate(LocalDateTime.now());
+            dto.setYear(evaluation.getYear());
+            dto.setQuarter(evaluation.getQuarter());
 
-            log.info("Updating evaluation {} for task {}", evaluationId, evaluation.getTask().getTaskId());
-
-            return evaluationService.updateEvaluation(evaluationId, updateDTO).orElse(null);
+            log.info("Updating evaluation {} for staff {} on task {}",
+                    evaluationId, evaluation.getStaffId(), evaluation.getTask().getTaskId());
+            return evaluationService.updateEvaluation(evaluationId, dto).orElse(null);
         });
     }
 
-    /**
-     * Get department-wise evaluation statistics - AGGREGATE ONLY, not affecting individual staff
-     */
+    // =========================
+    // DEPARTMENT STATS (aggregate)
+    // =========================
+
     public Map<String, Object> getDepartmentEvaluationStats(Long departmentId) {
-        List<User> staffMembers;
+        List<User> staffMembers = (departmentId != null)
+                ? userRepository.findStaffByDepartmentId(departmentId)
+                : userRepository.findByRole(Role.STAFF);
 
-        if (departmentId != null) {
-            staffMembers = userRepository.findStaffByDepartmentId(departmentId);
-        } else {
-            staffMembers = userRepository.findByRole(Role.STAFF);
-        }
-
-        Map<String, Object> stats = new HashMap<>();
-
-        double avgScore = 0.0;
-        double avgCompletionRate = 0.0;
-        int totalStaff = staffMembers.size();
-
-        Map<String, Integer> performanceDistribution = new HashMap<>();
-        performanceDistribution.put("Excellent", 0);
-        performanceDistribution.put("Good", 0);
-        performanceDistribution.put("Satisfactory", 0);
-        performanceDistribution.put("Needs Improvement", 0);
-        performanceDistribution.put("Poor", 0);
-        performanceDistribution.put("Not Evaluated", 0);
+        double totalScore = 0, totalCompletion = 0;
+        Map<String, Integer> perfDist = new HashMap<>();
+        perfDist.put("Excellent", 0);
+        perfDist.put("Good", 0);
+        perfDist.put("Satisfactory", 0);
+        perfDist.put("Needs Improvement", 0);
+        perfDist.put("Poor", 0);
+        perfDist.put("Not Evaluated", 0);
 
         for (User staff : staffMembers) {
-            Map<String, Object> summary = getStaffEvaluationSummary(staff);
-            avgScore += (double) summary.get("averageScore");
-            avgCompletionRate += (double) summary.get("completionRate");
-
-            String level = (String) summary.get("performanceLevel");
-            performanceDistribution.put(level, performanceDistribution.getOrDefault(level, 0) + 1);
+            Map<String, Object> sum = getStaffEvaluationSummary(staff);
+            totalScore += (double) sum.get("averageScore");
+            totalCompletion += (double) sum.get("completionRate");
+            String level = (String) sum.get("performanceLevel");
+            perfDist.merge(level, 1, Integer::sum);
         }
 
-        stats.put("totalStaff", totalStaff);
-        stats.put("averageScore", totalStaff > 0 ? Math.round(avgScore / totalStaff * 100.0) / 100.0 : 0.0);
-        stats.put("averageCompletionRate", totalStaff > 0 ? Math.round(avgCompletionRate / totalStaff * 100.0) / 100.0 : 0.0);
-        stats.put("performanceDistribution", performanceDistribution);
-
-        return stats;
+        int count = staffMembers.size();
+        Map<String, Object> result = new HashMap<>();
+        result.put("totalStaff", count);
+        result.put("averageScore", count > 0 ? Math.round(totalScore / count * 100.0) / 100.0 : 0.0);
+        result.put("averageCompletionRate", count > 0 ? Math.round(totalCompletion / count * 100.0) / 100.0 : 0.0);
+        result.put("performanceDistribution", perfDist);
+        return result;
     }
 
-    /**
-     * Get quarterly evaluation report for a specific staff
-     */
+    // =========================
+    // QUARTERLY REPORTS
+    // =========================
+
     public List<Map<String, Object>> getStaffQuarterlyReport(Long staffId, Integer year, Integer quarter) {
+        // ✅ FIXED: Get evaluations directly by staff_id
         List<Evaluation> evaluations;
-
         if (year != null && quarter != null) {
-            evaluations = evaluationRepository.findByYearAndQuarter(year, quarter);
+            evaluations = evaluationRepository.findByStaffIdAndYearAndQuarter(staffId, year, quarter);
         } else if (year != null) {
-            evaluations = evaluationRepository.findByYear(year);
+            evaluations = evaluationRepository.findByStaffIdAndYear(staffId, year);
         } else {
-            evaluations = evaluationRepository.findAll();
+            evaluations = evaluationRepository.findByStaffId(staffId);
         }
 
-        List<Map<String, Object>> staffEvals = new ArrayList<>();
-
-        for (Evaluation evaluation : evaluations) {
-            // Verify this evaluation belongs to this staff member
-            Optional<TaskAssignment> assignment = taskAssignmentRepository
-                    .findByStaffIdAndTask_TaskId(staffId, evaluation.getTask().getTaskId());
-            if (assignment.isPresent()) {
-                Map<String, Object> evalMap = new HashMap<>();
-                evalMap.put("evaluationId", evaluation.getEvaluationId());
-                evalMap.put("evaluationCode", evaluation.getEvaluationCode());
-                evalMap.put("taskId", evaluation.getTask().getTaskId());
-                evalMap.put("taskDescription", evaluation.getTask().getDescription());
-                evalMap.put("score", evaluation.getScore());
-                evalMap.put("remarks", evaluation.getRemarks());
-                evalMap.put("evaluationDate", evaluation.getEvaluationDate());
-                evalMap.put("quarter", evaluation.getQuarter());
-                evalMap.put("year", evaluation.getYear());
-                staffEvals.add(evalMap);
-            }
-        }
-
-        return staffEvals;
+        return evaluations.stream()
+                .map(e -> {
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("evaluationId", e.getEvaluationId());
+                    map.put("evaluationCode", e.getEvaluationCode());
+                    map.put("taskId", e.getTask() != null ? e.getTask().getTaskId() : null);
+                    map.put("taskDescription", e.getTask() != null ? e.getTask().getDescription() : null);
+                    map.put("taskCode", e.getTask() != null ? e.getTask().getTaskCode() : null);
+                    map.put("score", e.getScore());
+                    map.put("remarks", e.getRemarks());
+                    map.put("evaluationDate", e.getEvaluationDate());
+                    map.put("quarter", e.getQuarter());
+                    map.put("year", e.getYear());
+                    return map;
+                })
+                .collect(Collectors.toList());
     }
 
-    /**
-     * Get quarterly evaluation report for all staff
-     */
     public List<Map<String, Object>> getQuarterlyReport(Integer year, Integer quarter) {
-        List<Evaluation> evaluations;
-
-        if (year != null && quarter != null) {
-            evaluations = evaluationRepository.findByYearAndQuarter(year, quarter);
-        } else if (year != null) {
-            evaluations = evaluationRepository.findByYear(year);
-        } else {
-            evaluations = evaluationRepository.findAll();
-        }
+        // Get all evaluations for the specified period
+        List<Evaluation> evaluations = (year != null && quarter != null)
+                ? evaluationRepository.findByYearAndQuarter(year, quarter)
+                : (year != null) ? evaluationRepository.findByYear(year) : evaluationRepository.findAll();
 
         Map<Long, Map<String, Object>> staffStats = new HashMap<>();
 
-        for (Evaluation evaluation : evaluations) {
-            // Get staff from task assignment
-            List<TaskAssignment> assignments = taskAssignmentRepository.findByTask_TaskIdList(evaluation.getTask().getTaskId());
-            User staff = assignments.isEmpty() ? null : assignments.get(0).getAssignUser();
+        for (Evaluation e : evaluations) {
+            Long staffId = e.getStaffId();
+            if (staffId == null) continue;
 
+            // Get staff info
+            User staff = userRepository.findByStaffId(staffId).orElse(null);
             if (staff == null || staff.getRole() != Role.STAFF) continue;
 
-            Map<String, Object> stats = staffStats.getOrDefault(staff.getStaffId(), new HashMap<>());
-            stats.put("staffId", staff.getStaffId());
-            stats.put("staffName", staff.getFirstName() + " " + (staff.getOtherName() != null ? staff.getOtherName() : ""));
-            stats.put("staffCode", staff.getStaffCode());
+            final Long finalStaffId = staffId;
+            staffStats.computeIfAbsent(staffId, id -> {
+                Map<String, Object> s = new HashMap<>();
+                s.put("staffId", id);
+                s.put("staffName", staff.getFirstName() + " " + (staff.getOtherName() != null ? staff.getOtherName() : ""));
+                s.put("staffCode", staff.getStaffCode());
+                s.put("branchName", staff.getBranch() != null ? staff.getBranch().getBranchName() : "Not Assigned");
+                s.put("departmentName", staff.getDepartment() != null ? staff.getDepartment().getDepartmentName() : "Not Assigned");
+                s.put("totalScore", 0.0);
+                s.put("count", 0);
+                return s;
+            });
 
-            double totalScore = (double) stats.getOrDefault("totalScore", 0.0);
-            int count = (int) stats.getOrDefault("count", 0);
-
-            totalScore += evaluation.getScore();
-            count++;
-
-            stats.put("totalScore", totalScore);
-            stats.put("count", count);
-            stats.put("averageScore", Math.round((totalScore / count) * 100.0) / 100.0);
-            stats.put("performanceLevel", determinePerformanceLevel(totalScore / count));
-
-            staffStats.put(staff.getStaffId(), stats);
+            Map<String, Object> stats = staffStats.get(staffId);
+            double total = (double) stats.get("totalScore") + (e.getScore() != null ? e.getScore() : 0);
+            int cnt = (int) stats.get("count") + 1;
+            stats.put("totalScore", total);
+            stats.put("count", cnt);
+            double avgScore = total / cnt;
+            stats.put("averageScore", Math.round(avgScore * 100.0) / 100.0);
+            stats.put("performanceLevel", determinePerformanceLevel(avgScore));
         }
-
         return new ArrayList<>(staffStats.values());
     }
 
+    // =========================
+    // ADDITIONAL HELPER METHODS FOR STAFF ISOLATION
+    // =========================
+
     /**
-     * Determine performance level based ONLY on average score
+     * Get all evaluations for a specific staff member as DTO responses
+     * Uses the existing EvaluationService method
      */
+    public List<EvaluationDTOResponse> getEvaluationsByStaffId(Long staffId) {
+        return evaluationService.getEvaluationsByStaffId(staffId);
+    }
+
+    /**
+     * Check if a staff member has an evaluation for a specific task and quarter
+     */
+    public boolean hasEvaluationForTaskAndQuarter(Long staffId, Long taskId, Integer year, Integer quarter) {
+        return evaluationRepository.existsByStaffIdAndTaskIdAndYearAndQuarter(staffId, taskId, year, quarter);
+    }
+
+    /**
+     * Get average score for a staff member across all evaluations
+     */
+    public Double getStaffAverageScore(Long staffId) {
+        return evaluationService.getAverageScoreByStaffId(staffId);
+    }
+
+    // =========================
+    // HELPERS
+    // =========================
+
     private String determinePerformanceLevel(double averageScore) {
-        if (averageScore == 0.0) {
-            return "Not Evaluated";
-        } else if (averageScore >= 90) {
-            return "Excellent";
-        } else if (averageScore >= 75) {
-            return "Good";
-        } else if (averageScore >= 60) {
-            return "Satisfactory";
-        } else if (averageScore >= 40) {
-            return "Needs Improvement";
-        } else {
-            return "Poor";
-        }
+        if (averageScore == 0.0) return "Not Evaluated";
+        if (averageScore >= 90) return "Excellent";
+        if (averageScore >= 75) return "Good";
+        if (averageScore >= 60) return "Satisfactory";
+        if (averageScore >= 40) return "Needs Improvement";
+        return "Poor";
     }
 
     private Integer getCurrentQuarter() {
         int month = LocalDateTime.now().getMonthValue();
-        if (month <= 3) return 1;
-        else if (month <= 6) return 2;
-        else if (month <= 9) return 3;
-        else return 4;
+        return (month <= 3) ? 1 : (month <= 6) ? 2 : (month <= 9) ? 3 : 4;
     }
 }

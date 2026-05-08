@@ -34,7 +34,7 @@ public class UserService {
     }
 
     // =========================
-    // Convert User entity → Response DTO
+    // Convert User entity → Response DTO (FIXED - added IDs)
     // =========================
     private UserDTOResponse toResponse(User user) {
         if (user == null) return null;
@@ -46,11 +46,21 @@ public class UserService {
         dto.setOtherName(user.getOtherName());
         dto.setEmail(user.getEmail());
         dto.setPhoneNumber(user.getPhoneNumber());
-        dto.setRole(user.getRole() != null ? user.getRole().name() : null); // enum to string
+        dto.setRole(user.getRole() != null ? user.getRole().name() : null);
         dto.setRank(user.getRank());
-        dto.setDepartmentName(user.getDepartment() != null ? user.getDepartment().getDepartmentName() : null);
-        dto.setBranchName(user.getBranch() != null ? user.getBranch().getBranchName() : null);
         dto.setActive(user.getActive());
+
+        // ✅ FIX: Set Department ID and Name
+        if (user.getDepartment() != null) {
+            dto.setDepartmentId(user.getDepartment().getDepartmentId());
+            dto.setDepartmentName(user.getDepartment().getDepartmentName());
+        }
+
+        // ✅ FIX: Set Branch ID and Name
+        if (user.getBranch() != null) {
+            dto.setBranchId(user.getBranch().getBranchId());
+            dto.setBranchName(user.getBranch().getBranchName());
+        }
 
         return dto;
     }
@@ -104,19 +114,17 @@ public class UserService {
         user.setOtherName(userDTO.getOtherName());
         user.setEmail(userDTO.getEmail());
         user.setPhoneNumber(userDTO.getPhoneNumber());
-        user.setRole(userDTO.getRole()); // enum
+        user.setRole(userDTO.getRole());
         user.setRank(userDTO.getRank());
         user.setActive(true);
-        user.setPasswordHash(passwordEncoder.encode("default123")); // default password
+        user.setPasswordHash(passwordEncoder.encode("default123"));
 
-        // Set Department
         if (userDTO.getDepartmentId() != null) {
             Department dept = departmentRepository.findById(userDTO.getDepartmentId())
                     .orElseThrow(() -> new RuntimeException("Department not found with id: " + userDTO.getDepartmentId()));
             user.setDepartment(dept);
         }
 
-        // Set Branch
         if (userDTO.getBranchId() != null) {
             Branch branch = branchRepository.findById(userDTO.getBranchId())
                     .orElseThrow(() -> new RuntimeException("Branch not found with id: " + userDTO.getBranchId()));
@@ -133,17 +141,12 @@ public class UserService {
     public Optional<UserDTOResponse> updateUserByStaffCode(Long staffCode, UserDTO userDTO) {
         return userRepository.findByStaffCode(staffCode)
                 .map(user -> {
-
-                    // Update simple fields
                     if (userDTO.getFirstName() != null) user.setFirstName(userDTO.getFirstName());
                     if (userDTO.getOtherName() != null) user.setOtherName(userDTO.getOtherName());
                     if (userDTO.getPhoneNumber() != null) user.setPhoneNumber(userDTO.getPhoneNumber());
                     if (userDTO.getRank() != null) user.setRank(userDTO.getRank());
-
-                    // Update role (enum) safely
                     if (userDTO.getRole() != null) user.setRole(userDTO.getRole());
 
-                    // Update email with uniqueness check
                     if (userDTO.getEmail() != null && !userDTO.getEmail().equals(user.getEmail())) {
                         if (userRepository.existsByEmail(userDTO.getEmail())) {
                             throw new RuntimeException("Email already in use: " + userDTO.getEmail());
@@ -151,40 +154,57 @@ public class UserService {
                         user.setEmail(userDTO.getEmail());
                     }
 
-                    // Update Department
                     if (userDTO.getDepartmentId() != null) {
                         Department dept = departmentRepository.findById(userDTO.getDepartmentId())
                                 .orElseThrow(() -> new RuntimeException("Department not found with id: " + userDTO.getDepartmentId()));
                         user.setDepartment(dept);
+                    } else {
+                        user.setDepartment(null);
                     }
 
-                    // Update Branch
                     if (userDTO.getBranchId() != null) {
                         Branch branch = branchRepository.findById(userDTO.getBranchId())
                                 .orElseThrow(() -> new RuntimeException("Branch not found with id: " + userDTO.getBranchId()));
                         user.setBranch(branch);
+                    } else {
+                        user.setBranch(null);
                     }
 
                     return toResponse(userRepository.save(user));
                 });
     }
+
     // =========================
-// Update role only (enum-safe)
-// =========================
+    // Update role only (enum-safe)
+    // =========================
     @Transactional
     public Optional<UserDTOResponse> updateUserRole(Long staffCode, Role role) {
         return userRepository.findByStaffCode(staffCode)
                 .map(user -> {
-                    user.setRole(role); // Enum assignment
+                    user.setRole(role);
                     User savedUser = userRepository.save(user);
-                    return toResponse(savedUser); // Use existing method
+                    return toResponse(savedUser);
                 });
     }
+
     @Transactional
     public boolean updateUserRoleOnly(Long staffCode, Role role) {
         int updated = userRepository.updateRoleByStaffCode(staffCode, role);
-        return updated > 0; // returns true if role was updated
+        return updated > 0;
     }
+
+    // =========================
+    // Update user active status
+    // =========================
+    @Transactional
+    public Optional<UserDTOResponse> updateUserActiveStatus(Long staffCode, Boolean active) {
+        return userRepository.findByStaffCode(staffCode)
+                .map(user -> {
+                    user.setActive(active);
+                    return toResponse(userRepository.save(user));
+                });
+    }
+
     // =========================
     // Delete user by staff code
     // =========================
